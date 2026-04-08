@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: geargrade-backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./data/geargrade.db}
+      MEDIA_ROOT: ${MEDIA_ROOT:-./data/media}
+      MEDIA_URL_PREFIX: ${MEDIA_URL_PREFIX:-/media}
+      SEED_SAMPLE_DATA: ${SEED_SAMPLE_DATA:-true}
+      APP_ENV: ${APP_ENV:-production}
+    volumes:
+      - geargrade_data:/app/data
+      - geargrade_media:/app/data/media
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: geargrade-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  geargrade_data:
+  geargrade_media:

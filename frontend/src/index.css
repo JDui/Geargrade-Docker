@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", "Noto Sans SC", sans-serif;
+  background: #0b1018;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(92, 200, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, #0b1018 0%, #0a111a 45%, #0b1018 100%);
+  background-size: auto, auto;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.panel {
+  @apply rounded-2xl border border-line bg-panel/90 shadow-panel backdrop-blur;
+}
+
+.field {
+  @apply w-full rounded-xl border border-line bg-panelAlt px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-accent;
+}
+
+.field-label {
+  @apply mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-slate-400;
+}
+
+.button {
+  @apply inline-flex items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-medium transition;
+}
+
+.button-primary {
+  @apply button border-accent/40 bg-accent/15 text-accent hover:bg-accent/20;
+}
+
+.button-secondary {
+  @apply button bg-panelAlt text-slate-200 hover:border-accent/30 hover:text-white;
+}
+
+.button-danger {
+  @apply button border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
+}
