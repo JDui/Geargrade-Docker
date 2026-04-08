@@ -1,8 +1,9 @@
 services:
-  backend:
+  app:
     build:
-      context: ./backend
-    container_name: geargrade-backend
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: geargrade-app
     env_file:
       - .env
     environment:
@@ -14,16 +15,8 @@ services:
     volumes:
       - geargrade_data:/app/data
       - geargrade_media:/app/data/media
-    restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-    container_name: geargrade-frontend
-    depends_on:
-      - backend
     ports:
-      - "8080:80"
+      - "8080:8000"
     restart: unless-stopped
 
 volumes:

@@ -1,0 +1,48 @@
+{
+  "items": [
+    {
+      "name": "Fujifilm X-T5",
+      "brand": "Fujifilm",
+      "category": "camera_body",
+      "mount_system_key": "x",
+      "mount_system_custom": null,
+      "status": "holding",
+      "score": 103,
+      "acquisition_iteration": 1,
+      "pros": ["复古外形", "4000 万像素", "机身防抖强"],
+      "cons": ["视频规格一般", "价格偏高"],
+      "review_detail": "静态摄影体验很强，色彩和直出都稳定，旅行和日常拍摄都很顺手。",
+      "tags": ["旗舰", "旅行", "收藏"],
+      "purchase_price": 12500,
+      "sale_price": null,
+      "purchase_date": "2023-10-01",
+      "sale_date": null,
+      "image_source_type": null,
+      "image_original_url": null,
+      "image_storage_path": null,
+      "image_storage_name": null
+    },
+    {
+      "name": "Contax T2",
+      "brand": "Contax",
+      "category": "camera_body",
+      "mount_system_key": "none",
+      "mount_system_custom": null,
+      "status": "broken",
+      "score": -1,
+      "acquisition_iteration": 3,
+      "pros": ["外观经典", "收藏价值高"],
+      "cons": ["维修难", "价格虚高"],
+      "review_detail": "这类设备的意义更多是把玩和收藏，不适合只看性价比。",
+      "tags": ["胶片", "收藏", "正在感受"],
+      "purchase_price": 9800,
+      "sale_price": 0,
+      "purchase_date": "2021-03-05",
+      "sale_date": null,
+      "image_source_type": null,
+      "image_original_url": null,
+      "image_storage_path": null,
+      "image_storage_name": null
+    }
+  ]
+}

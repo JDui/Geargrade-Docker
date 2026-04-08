@@ -28,14 +28,14 @@ export function StringListEditor({ value, onChange, placeholder }: StringListEdi
             <button
               key={`${item}-${value.indexOf(item)}`}
               type="button"
-              className="rounded-full border border-line px-3 py-1 text-sm text-slate-200 hover:border-danger/40 hover:text-danger"
+              className="rounded-full border border-line px-3 py-1 text-sm text-textPrimary transition hover:border-danger/40 hover:text-danger"
               onClick={() => removeItem(item)}
             >
               {item} ×
             </button>
           ))
         ) : (
-          <span className="text-sm text-slate-500">暂无内容</span>
+          <span className="text-sm text-textSecondary">暂无内容</span>
         )}
       </div>
       <div className="mt-3 flex gap-2">

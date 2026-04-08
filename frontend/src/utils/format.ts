@@ -44,3 +44,13 @@ export function formatDateTime(value: string | null | undefined): string {
     minute: "2-digit"
   }).format(date);
 }
+
+export function formatDurationDays(days: number): string {
+  if (days < 30) {
+    return `${days} 天`;
+  }
+  if (days < 365) {
+    return `${(days / 30).toFixed(1)} 个月`;
+  }
+  return `${(days / 365).toFixed(1)} 年`;
+}

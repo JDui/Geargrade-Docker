@@ -5,20 +5,22 @@ export default {
   theme: {
     extend: {
       colors: {
-        surface: "#0b1018",
-        panel: "#111926",
-        panelAlt: "#182233",
-        line: "#223045",
-        accent: "#5cc8ff",
-        success: "#52c98d",
-        warning: "#f3c969",
-        danger: "#ef6f7d"
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        panel: "rgb(var(--color-panel) / <alpha-value>)",
+        panelAlt: "rgb(var(--color-panel-alt) / <alpha-value>)",
+        line: "rgb(var(--color-line) / <alpha-value>)",
+        accent: "rgb(var(--color-accent) / <alpha-value>)",
+        success: "rgb(var(--color-success) / <alpha-value>)",
+        warning: "rgb(var(--color-warning) / <alpha-value>)",
+        danger: "rgb(var(--color-danger) / <alpha-value>)",
+        textPrimary: "rgb(var(--color-text-primary) / <alpha-value>)",
+        textSecondary: "rgb(var(--color-text-secondary) / <alpha-value>)"
       },
       boxShadow: {
-        panel: "0 18px 45px rgba(5, 10, 20, 0.35)"
+        panel: "0 18px 45px rgba(5, 10, 20, 0.18)"
       },
       backgroundImage: {
-        grid: "radial-gradient(circle at 1px 1px, rgba(92, 200, 255, 0.12) 1px, transparent 0)"
+        grid: "radial-gradient(circle at 1px 1px, rgba(var(--color-accent) / 0.12) 1px, transparent 0)"
       }
     }
   },

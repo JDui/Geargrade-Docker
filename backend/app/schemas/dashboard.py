@@ -1,15 +1,16 @@
 from pydantic import BaseModel
 
-from app.core.enums import DeviceCategory, DeviceRating
+from app.core.enums import DeviceCategory, RatingLabel
 
 
 class CountBucket(BaseModel):
-    key: DeviceCategory | DeviceRating
+    key: DeviceCategory | RatingLabel
     count: int
 
 
 class DashboardSummary(BaseModel):
     currently_owned_count: int
     sold_count: int
+    feeling_in_progress_count: int
     ratings: list[CountBucket]
     categories: list[CountBucket]

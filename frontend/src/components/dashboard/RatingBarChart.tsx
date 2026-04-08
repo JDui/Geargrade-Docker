@@ -1,36 +1,61 @@
-import { Bar, BarChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { RATING_LABELS, type DashboardBucket, type RatingLabel } from "../../types/device";
 
-import { RATING_LABELS, type DashboardBucket, type DeviceRating } from "../../types/device";
-
-const barColors: Record<DeviceRating, string> = {
+const barColors: Record<RatingLabel, string> = {
   god: "#f7c95f",
   excellent: "#55d39b",
   average: "#69b8ff",
-  low: "#f27b8b",
-  special: "#b28cff"
+  low: "#f27b8b"
 };
 
 interface RatingBarChartProps {
-  data: DashboardBucket<DeviceRating>[];
+  data: DashboardBucket<RatingLabel>[];
 }
 
 export function RatingBarChart({ data }: RatingBarChartProps) {
-  const chartData = data.map((item) => ({
-    ...item,
-    label: RATING_LABELS[item.key]
-  }));
+  const total = data.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <ResponsiveContainer width="100%" height={170}>
-      <BarChart data={chartData}>
-        <XAxis dataKey="label" tick={{ fill: "#8ea1bb", fontSize: 12 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: "#72839a", fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
-        <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-          {chartData.map((entry) => (
-            <Cell key={entry.key} fill={barColors[entry.key]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-full border border-line bg-panelAlt">
+        <div className="flex h-5 w-full">
+          {data.map((item) => {
+            const width =
+              total > 0 && item.count > 0 ? `${(item.count / total) * 100}%` : "0%";
+            return (
+              <div
+                key={item.key}
+                className="h-full transition-[width]"
+                style={{ width, backgroundColor: barColors[item.key] }}
+                title={`${RATING_LABELS[item.key]} ${item.count}`}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {data.map((item) => {
+          const percent = total > 0 ? `${Math.round((item.count / total) * 100)}%` : "0%";
+          return (
+            <div
+              key={item.key}
+              className="flex items-center justify-between gap-3 rounded-xl bg-panelAlt/80 px-3 py-3"
+            >
+              <span className="flex items-center gap-2 text-sm text-textPrimary">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: barColors[item.key] }}
+                />
+                {RATING_LABELS[item.key]}
+              </span>
+              <span className="text-sm font-semibold text-textPrimary">
+                {item.count}
+                <span className="ml-2 text-xs font-medium text-textSecondary">{percent}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

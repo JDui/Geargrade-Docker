@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { createDevice, fetchDevice, updateDevice } from "../api/devices";
 import { cacheRemoteMedia, uploadMedia } from "../api/media";
 import { DeviceForm, type ImageMode } from "../components/forms/DeviceForm";
+import { useDashboardSummary } from "../components/layout/DashboardSummaryProvider";
 import type { DeviceDetail, DevicePayload } from "../types/device";
 
 interface DeviceFormPageProps {
@@ -13,6 +14,7 @@ interface DeviceFormPageProps {
 export default function DeviceFormPage({ mode }: DeviceFormPageProps) {
   const { deviceId } = useParams();
   const navigate = useNavigate();
+  const { refreshSummary } = useDashboardSummary();
   const [device, setDevice] = useState<DeviceDetail | undefined>(undefined);
   const [loading, setLoading] = useState(mode === "edit");
   const [submitting, setSubmitting] = useState(false);
@@ -96,6 +98,7 @@ export default function DeviceFormPage({ mode }: DeviceFormPageProps) {
         mode === "create"
           ? await createDevice(payload)
           : await updateDevice(String(deviceId), payload);
+      await refreshSummary();
       navigate(`/devices/${result.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存设备失败。");
@@ -109,7 +112,7 @@ export default function DeviceFormPage({ mode }: DeviceFormPageProps) {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-xs uppercase tracking-[0.22em] text-accent/80">Geargrade</div>
-          <h1 className="mt-1 text-3xl font-semibold text-white">{title}</h1>
+          <h1 className="mt-1 text-3xl font-semibold text-textPrimary">{title}</h1>
         </div>
         <Link to="/" className="button-secondary">
           返回首页
@@ -117,7 +120,7 @@ export default function DeviceFormPage({ mode }: DeviceFormPageProps) {
       </div>
 
       {error ? <div className="rounded-2xl border border-danger/40 bg-danger/10 p-4 text-danger">{error}</div> : null}
-      {loading ? <div className="panel p-5 text-slate-300">正在加载设备信息...</div> : null}
+      {loading ? <div className="panel p-5 text-textSecondary">正在加载设备信息...</div> : null}
 
       {!loading ? (
         <DeviceForm

@@ -1,23 +1,19 @@
 from collections.abc import Iterable
 
-from sqlalchemy import Select, case, or_, select
+from sqlalchemy import Select, and_, extract, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import Settings
-from app.core.enums import DeviceRating, DeviceStatus
+from app.core.enums import (
+    DeviceStatus,
+    MountSystemKey,
+    RatingLabel,
+    mount_system_label_for,
+    rating_label_from_score,
+)
 from app.models.device import Device
 from app.models.tag import Tag
 from app.schemas.device import DeviceCreate, DeviceDetail, DeviceListItem, DeviceUpdate, SortBy, SortOrder
-
-
-RATING_WEIGHT = {
-    DeviceRating.GOD: 5,
-    DeviceRating.EXCELLENT: 4,
-    DeviceRating.AVERAGE: 3,
-    DeviceRating.LOW: 2,
-    DeviceRating.SPECIAL: 1,
-}
-OWNED_STATUSES = {DeviceStatus.HOLDING, DeviceStatus.FOR_SALE, DeviceStatus.PENDING}
 
 
 def _normalize_tag_names(tag_names: Iterable[str]) -> list[str]:
@@ -43,16 +39,18 @@ def serialize_device(device: Device, settings: Settings, detailed: bool = False)
         "name": device.name,
         "brand": device.brand,
         "category": device.category,
-        "mount_system": device.mount_system,
+        "mount_system_key": device.mount_system_key,
+        "mount_system_custom": device.mount_system_custom,
+        "mount_system_label": mount_system_label_for(device.mount_system_key, device.mount_system_custom),
         "status": device.status,
-        "rating": device.rating,
-        "summary": device.summary,
+        "score": device.score,
+        "rating_label": rating_label_from_score(device.score),
+        "acquisition_iteration": device.acquisition_iteration,
         "tags": [tag.name for tag in device.tags],
         "purchase_price": device.purchase_price,
         "sale_price": device.sale_price,
         "purchase_date": device.purchase_date,
         "sale_date": device.sale_date,
-        "is_currently_owned": device.is_currently_owned,
         "image_source_type": device.image_source_type,
         "image_original_url": device.image_original_url,
         "image_storage_path": device.image_storage_path,
@@ -69,13 +67,32 @@ def serialize_device(device: Device, settings: Settings, detailed: bool = False)
     return DeviceListItem(**payload)
 
 
-def _derive_owned_flag(status: DeviceStatus, explicit_value: bool | None) -> bool:
-    if explicit_value is not None:
-        return explicit_value
-    return status in OWNED_STATUSES
+def export_device_payload(device: Device) -> DeviceCreate:
+    return DeviceCreate(
+        name=device.name,
+        brand=device.brand,
+        category=device.category,
+        mount_system_key=device.mount_system_key,
+        mount_system_custom=device.mount_system_custom,
+        status=device.status,
+        score=device.score,
+        acquisition_iteration=device.acquisition_iteration,
+        pros=device.pros or [],
+        cons=device.cons or [],
+        review_detail=device.review_detail,
+        tags=[tag.name for tag in device.tags],
+        purchase_price=device.purchase_price,
+        sale_price=device.sale_price,
+        purchase_date=device.purchase_date,
+        sale_date=device.sale_date,
+        image_source_type=device.image_source_type,
+        image_original_url=device.image_original_url,
+        image_storage_path=device.image_storage_path,
+        image_storage_name=device.image_storage_name,
+    )
 
 
-def _cleanup_media_file(settings: Settings, storage_path: str | None) -> None:
+def _cleanup_media_file(settings: Settings | None, storage_path: str | None) -> None:
     if not settings or not storage_path:
         return
     target = settings.media_root / storage_path
@@ -105,31 +122,53 @@ def _assign_tags(session: Session, device: Device, tag_names: Iterable[str]) -> 
     device.tags = resolved_tags
 
 
+def _normalize_mount_fields(data: dict) -> None:
+    mount_key = data.get("mount_system_key")
+    if mount_key == MountSystemKey.NONE:
+        data["mount_system_custom"] = None
+    elif mount_key != MountSystemKey.OTHER:
+        data["mount_system_custom"] = None
+
+
+def _normalize_sale_fields(data: dict) -> None:
+    status = data.get("status")
+    if status in {DeviceStatus.HOLDING, DeviceStatus.FOR_SALE}:
+        data["sale_date"] = None
+        data["sale_price"] = None
+    elif status == DeviceStatus.BROKEN:
+        data["sale_date"] = None
+        data["sale_price"] = 0
+
+
 def create_device(session: Session, payload: DeviceCreate, settings: Settings | None) -> Device:
+    data = payload.model_dump()
+    _normalize_mount_fields(data)
+    _normalize_sale_fields(data)
+
     device = Device(
-        name=payload.name,
-        brand=payload.brand,
-        category=payload.category,
-        mount_system=payload.mount_system,
-        status=payload.status,
-        rating=payload.rating,
-        summary=payload.summary,
-        pros=payload.pros,
-        cons=payload.cons,
-        review_detail=payload.review_detail,
-        purchase_price=payload.purchase_price,
-        sale_price=payload.sale_price,
-        purchase_date=payload.purchase_date,
-        sale_date=payload.sale_date,
-        is_currently_owned=_derive_owned_flag(payload.status, payload.is_currently_owned),
-        image_source_type=payload.image_source_type,
-        image_original_url=payload.image_original_url,
-        image_storage_path=payload.image_storage_path,
-        image_storage_name=payload.image_storage_name,
+        name=data["name"],
+        brand=data["brand"],
+        category=data["category"],
+        mount_system_key=data["mount_system_key"],
+        mount_system_custom=data["mount_system_custom"],
+        status=data["status"],
+        score=data["score"],
+        acquisition_iteration=data["acquisition_iteration"],
+        pros=data["pros"],
+        cons=data["cons"],
+        review_detail=data["review_detail"],
+        purchase_price=data["purchase_price"],
+        sale_price=data["sale_price"],
+        purchase_date=data["purchase_date"],
+        sale_date=data["sale_date"],
+        image_source_type=data["image_source_type"],
+        image_original_url=data["image_original_url"],
+        image_storage_path=data["image_storage_path"],
+        image_storage_name=data["image_storage_name"],
     )
     session.add(device)
     session.flush()
-    _assign_tags(session, device, payload.tags)
+    _assign_tags(session, device, data["tags"])
     session.commit()
     session.refresh(device)
     return device
@@ -140,18 +179,24 @@ def get_device(session: Session, device_id: int) -> Device | None:
     return session.scalar(statement)
 
 
+def get_devices_for_export(session: Session) -> list[Device]:
+    statement = select(Device).options(selectinload(Device.tags)).order_by(Device.purchase_date.desc(), Device.created_at.desc())
+    return session.execute(statement).scalars().unique().all()
+
+
 def update_device(session: Session, device: Device, payload: DeviceUpdate, settings: Settings) -> Device:
     data = payload.model_dump(exclude_unset=True)
     previous_storage_path = device.image_storage_path
     next_status = data.get("status", device.status)
-    explicit_owned_flag = data.get("is_currently_owned")
+
+    data["status"] = next_status
+    _normalize_mount_fields(data)
+    _normalize_sale_fields(data)
 
     for field, value in data.items():
         if field == "tags":
             continue
         setattr(device, field, value)
-
-    device.is_currently_owned = _derive_owned_flag(next_status, explicit_owned_flag)
 
     if "tags" in data:
         _assign_tags(session, device, data["tags"] or [])
@@ -184,7 +229,6 @@ def _apply_search(statement: Select[tuple[Device]], search: str | None) -> Selec
             or_(
                 Device.name.ilike(pattern),
                 Device.brand.ilike(pattern),
-                Device.summary.ilike(pattern),
                 Device.review_detail.ilike(pattern),
                 Tag.name.ilike(pattern),
             )
@@ -193,15 +237,26 @@ def _apply_search(statement: Select[tuple[Device]], search: str | None) -> Selec
     )
 
 
+def _apply_rating_label_filter(statement: Select[tuple[Device]], rating_label: str | None) -> Select[tuple[Device]]:
+    if not rating_label:
+        return statement
+
+    if rating_label == RatingLabel.GOD:
+        return statement.where(Device.score > 100)
+    if rating_label == RatingLabel.EXCELLENT:
+        return statement.where(and_(Device.score >= 80, Device.score <= 100))
+    if rating_label == RatingLabel.AVERAGE:
+        return statement.where(and_(Device.score >= 50, Device.score <= 79))
+    if rating_label == RatingLabel.LOW:
+        return statement.where(and_(Device.score >= 0, Device.score <= 49))
+    return statement
+
+
 def _apply_sort(statement: Select[tuple[Device]], sort_by: SortBy, sort_order: SortOrder) -> Select[tuple[Device]]:
     direction = {"asc": lambda value: value.asc(), "desc": lambda value: value.desc()}[sort_order]
-
-    if sort_by == "rating":
-        rating_case = case(RATING_WEIGHT, value=Device.rating, else_=0)
-        return statement.order_by(direction(rating_case), Device.updated_at.desc())
-
-    sort_column = getattr(Device, sort_by)
-    return statement.order_by(direction(sort_column), Device.updated_at.desc())
+    fallback_direction = {"asc": lambda value: value.asc(), "desc": lambda value: value.desc()}[sort_order]
+    sort_column = func.lower(Device.name) if sort_by == "name" else getattr(Device, sort_by)
+    return statement.order_by(direction(sort_column), fallback_direction(Device.created_at))
 
 
 def list_devices(
@@ -210,8 +265,10 @@ def list_devices(
     search: str | None = None,
     category: str | None = None,
     status: str | None = None,
-    rating: str | None = None,
-    sort_by: SortBy = "updated_at",
+    rating_label: str | None = None,
+    purchase_year: int | None = None,
+    feeling_only: bool | None = None,
+    sort_by: SortBy = "purchase_date",
     sort_order: SortOrder = "desc",
 ) -> tuple[list[DeviceListItem], int]:
     statement: Select[tuple[Device]] = select(Device).options(selectinload(Device.tags))
@@ -221,11 +278,25 @@ def list_devices(
         statement = statement.where(Device.category == category)
     if status:
         statement = statement.where(Device.status == status)
-    if rating:
-        statement = statement.where(Device.rating == rating)
+    if purchase_year:
+        statement = statement.where(extract("year", Device.purchase_date) == purchase_year)
+    if feeling_only is True:
+        statement = statement.where(Device.score == -1)
+    elif feeling_only is False:
+        statement = statement.where(Device.score >= 0)
 
+    statement = _apply_rating_label_filter(statement, rating_label)
     statement = _apply_sort(statement, sort_by, sort_order)
 
     devices = session.execute(statement).scalars().unique().all()
     items = [serialize_device(device, settings) for device in devices]
     return items, len(items)
+
+
+def make_dedup_key(payload: DeviceCreate) -> tuple[str, str, int, str | None]:
+    return (
+        payload.brand.strip().lower(),
+        payload.name.strip().lower(),
+        payload.acquisition_iteration,
+        payload.purchase_date.isoformat() if payload.purchase_date else None,
+    )

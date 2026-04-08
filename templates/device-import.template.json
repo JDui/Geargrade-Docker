@@ -1,0 +1,26 @@
+{
+  "items": [
+    {
+      "name": "",
+      "brand": "",
+      "category": "camera_body",
+      "mount_system_key": "none",
+      "mount_system_custom": null,
+      "status": "holding",
+      "score": -1,
+      "acquisition_iteration": 1,
+      "pros": [],
+      "cons": [],
+      "review_detail": "",
+      "tags": [],
+      "purchase_price": null,
+      "sale_price": null,
+      "purchase_date": null,
+      "sale_date": null,
+      "image_source_type": null,
+      "image_original_url": null,
+      "image_storage_path": null,
+      "image_storage_name": null
+    }
+  ]
+}

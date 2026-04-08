@@ -7,7 +7,11 @@ export function buildDeviceQuery(filters: DeviceFilters): string {
   if (filters.search.trim()) params.set("search", filters.search.trim());
   if (filters.category) params.set("category", filters.category);
   if (filters.status) params.set("status", filters.status);
-  if (filters.rating) params.set("rating", filters.rating);
+  if (filters.rating) {
+    params.set("rating_label", filters.rating);
+  }
+  if (filters.feelingOnly) params.set("feeling_only", "true");
+  if (filters.purchaseYear.trim()) params.set("purchase_year", filters.purchaseYear.trim());
   params.set("sort_by", filters.sortBy);
   params.set("sort_order", filters.sortOrder);
 

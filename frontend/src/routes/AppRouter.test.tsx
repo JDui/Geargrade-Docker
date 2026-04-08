@@ -2,6 +2,8 @@ import "@testing-library/jest-dom";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
+import { DashboardSummaryProvider } from "../components/layout/DashboardSummaryProvider";
+import { ThemeProvider } from "../components/layout/ThemeProvider";
 import { AppRouter } from "./AppRouter";
 
 class ResizeObserverMock {
@@ -20,8 +22,10 @@ class ResizeObserverMock {
 
 describe("AppRouter", () => {
   beforeAll(() => {
-    // @ts-expect-error test stub
-    global.ResizeObserver = ResizeObserverMock;
+    Object.defineProperty(globalThis, "ResizeObserver", {
+      value: ResizeObserverMock,
+      configurable: true
+    });
   });
 
   it("opens the detail drawer on device route", async () => {
@@ -33,12 +37,12 @@ describe("AppRouter", () => {
             JSON.stringify({
               currently_owned_count: 1,
               sold_count: 0,
+              feeling_in_progress_count: 0,
               ratings: [
                 { key: "god", count: 1 },
                 { key: "excellent", count: 0 },
                 { key: "average", count: 0 },
-                { key: "low", count: 0 },
-                { key: "special", count: 0 }
+                { key: "low", count: 0 }
               ],
               categories: [
                 { key: "camera_body", count: 1 },
@@ -60,16 +64,18 @@ describe("AppRouter", () => {
               name: "Fujifilm X-T5",
               brand: "Fujifilm",
               category: "camera_body",
-              mount_system: "X Mount",
+              mount_system_key: "x",
+              mount_system_custom: null,
+              mount_system_label: "X",
               status: "holding",
-              rating: "god",
-              summary: "测试摘要",
+              score: 103,
+              rating_label: "god",
+              acquisition_iteration: 1,
               tags: ["旗舰"],
               purchase_price: 12500,
               sale_price: null,
               purchase_date: "2023-10-01",
               sale_date: null,
-              is_currently_owned: true,
               image_source_type: null,
               image_original_url: null,
               image_storage_path: null,
@@ -90,9 +96,13 @@ describe("AppRouter", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(
-      <MemoryRouter initialEntries={["/devices/42"]}>
-        <AppRouter />
-      </MemoryRouter>
+      <ThemeProvider>
+        <DashboardSummaryProvider>
+          <MemoryRouter initialEntries={["/devices/42"]}>
+            <AppRouter />
+          </MemoryRouter>
+        </DashboardSummaryProvider>
+      </ThemeProvider>
     );
 
     await waitFor(() => {

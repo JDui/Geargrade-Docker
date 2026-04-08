@@ -9,49 +9,69 @@ interface CategoryDonutChartProps {
 }
 
 export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
+  const total = data.reduce((sum, item) => sum + item.count, 0);
   const chartData = data.map((item) => ({
     ...item,
-    label: CATEGORY_LABELS[item.key]
+    label: CATEGORY_LABELS[item.key],
+    percent: total > 0 ? Math.round((item.count / total) * 100) : 0
   }));
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[1fr,160px]">
-      <ResponsiveContainer width="100%" height={170}>
-        <PieChart>
-          <Pie
-            data={chartData}
-            dataKey="count"
-            nameKey="label"
-            innerRadius={44}
-            outerRadius={70}
-            paddingAngle={3}
-          >
-            {chartData.map((entry, index) => (
-              <Cell key={entry.key} fill={palette[index % palette.length]} />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={{
-              background: "#111926",
-              border: "1px solid #223045",
-              borderRadius: "12px",
-              color: "#fff"
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+    <div className="space-y-4">
+      <div className="h-[240px] min-w-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart margin={{ top: 6, right: 6, bottom: 6, left: 6 }}>
+            <Pie
+              data={chartData}
+              dataKey="count"
+              nameKey="label"
+              innerRadius={52}
+              outerRadius={82}
+              paddingAngle={3}
+            >
+              {chartData.map((entry, index) => (
+                <Cell key={entry.key} fill={palette[index % palette.length]} />
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={{
+                background: "var(--tooltip-bg)",
+                border: "1px solid var(--tooltip-border)",
+                borderRadius: "12px",
+                color: "rgb(var(--color-text-primary))",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.18)"
+              }}
+              formatter={(value: number, _name, props) => {
+                const payload = props?.payload as { label?: string; percent?: number } | undefined;
+                const label = payload?.label ?? "类别";
+                const percent = payload?.percent ?? 0;
+                return [`${label} · ${value} (${percent}%)`, "数量"];
+              }}
+              labelFormatter={() => "设备类别"}
+              labelStyle={{ color: "rgb(var(--color-text-primary))" }}
+              itemStyle={{ color: "rgb(var(--color-text-primary))" }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
 
-      <div className="grid content-start gap-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {chartData.map((item, index) => (
-          <div key={item.key} className="flex items-center justify-between gap-2 rounded-xl bg-panelAlt/80 px-3 py-2">
-            <span className="flex items-center gap-2 text-sm text-slate-200">
+          <div
+            key={item.key}
+            className="flex items-center justify-between gap-3 rounded-xl bg-panelAlt/80 px-3 py-2"
+          >
+            <span className="flex min-w-0 items-center gap-2 text-sm text-textPrimary">
               <span
-                className="h-2.5 w-2.5 rounded-full"
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: palette[index % palette.length] }}
               />
-              {item.label}
+              <span className="truncate">{item.label}</span>
             </span>
-            <span className="text-sm font-semibold text-white">{item.count}</span>
+            <span className="shrink-0 text-sm font-semibold text-textPrimary">
+              {item.count}
+              <span className="ml-2 text-xs font-medium text-textSecondary">{item.percent}%</span>
+            </span>
           </div>
         ))}
       </div>

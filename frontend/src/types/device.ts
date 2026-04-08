@@ -6,42 +6,56 @@ export type DeviceCategory =
   | "accessory"
   | "other";
 
-export type DeviceStatus =
-  | "holding"
-  | "for_sale"
-  | "sold"
-  | "archived"
-  | "pending"
-  | "broken";
-
-export type DeviceRating = "god" | "excellent" | "average" | "low" | "special";
+export type DeviceStatus = "holding" | "for_sale" | "sold" | "broken";
+export type RatingLabel = "god" | "excellent" | "average" | "low";
 export type ImageSourceType = "upload" | "cached_remote";
+export type MountSystemKey =
+  | "none"
+  | "fe"
+  | "e"
+  | "ef"
+  | "ef_s"
+  | "z"
+  | "rf"
+  | "x"
+  | "gfx"
+  | "l"
+  | "m43"
+  | "m42"
+  | "other";
 export type SortBy =
+  | "name"
+  | "category"
+  | "status"
   | "purchase_date"
   | "sale_date"
   | "purchase_price"
   | "sale_price"
-  | "rating"
+  | "score"
   | "updated_at"
   | "created_at";
 export type SortOrder = "asc" | "desc";
 export type ViewMode = "cards" | "table";
+export type ThemeMode = "dark" | "light";
+export type LeaderboardTab = "holding-duration" | "score" | "finance";
 
 export interface DeviceListItem {
   id: number;
   name: string;
   brand: string;
   category: DeviceCategory;
-  mount_system: string | null;
+  mount_system_key: MountSystemKey | null;
+  mount_system_custom: string | null;
+  mount_system_label: string | null;
   status: DeviceStatus;
-  rating: DeviceRating;
-  summary: string;
+  score: number;
+  rating_label: RatingLabel | null;
+  acquisition_iteration: number;
   tags: string[];
   purchase_price: number | null;
   sale_price: number | null;
   purchase_date: string | null;
   sale_date: string | null;
-  is_currently_owned: boolean;
   image_source_type: ImageSourceType | null;
   image_original_url: string | null;
   image_storage_path: string | null;
@@ -66,10 +80,11 @@ export interface DevicePayload {
   name: string;
   brand: string;
   category: DeviceCategory;
-  mount_system: string | null;
+  mount_system_key: MountSystemKey | null;
+  mount_system_custom: string | null;
   status: DeviceStatus;
-  rating: DeviceRating;
-  summary: string;
+  score: number;
+  acquisition_iteration: number;
   pros: string[];
   cons: string[];
   review_detail: string;
@@ -78,7 +93,6 @@ export interface DevicePayload {
   sale_price: number | null;
   purchase_date: string | null;
   sale_date: string | null;
-  is_currently_owned: boolean | null;
   image_source_type: ImageSourceType | null;
   image_original_url: string | null;
   image_storage_path: string | null;
@@ -93,7 +107,8 @@ export interface DashboardBucket<T extends string> {
 export interface DashboardSummary {
   currently_owned_count: number;
   sold_count: number;
-  ratings: DashboardBucket<DeviceRating>[];
+  feeling_in_progress_count: number;
+  ratings: DashboardBucket<RatingLabel>[];
   categories: DashboardBucket<DeviceCategory>[];
 }
 
@@ -109,9 +124,63 @@ export interface DeviceFilters {
   search: string;
   category: DeviceCategory | "";
   status: DeviceStatus | "";
-  rating: DeviceRating | "";
+  rating: RatingLabel | "";
+  feelingOnly: boolean;
+  purchaseYear: string;
   sortBy: SortBy;
   sortOrder: SortOrder;
+}
+
+export interface LeaderboardBaseItem {
+  rank: number;
+  device_id: number;
+  name: string;
+  brand: string;
+  score: number;
+  rating_label: RatingLabel | null;
+}
+
+export interface HoldingDurationItem extends LeaderboardBaseItem {
+  duration_days: number;
+  purchase_date: string | null;
+  sale_date: string | null;
+}
+
+export interface ScoreLeaderboardItem extends LeaderboardBaseItem {}
+
+export interface FinanceLeaderboardItem extends LeaderboardBaseItem {
+  profit_value: number;
+  purchase_price: number | null;
+  sale_price: number | null;
+}
+
+export interface HoldingDurationResponse {
+  items: HoldingDurationItem[];
+}
+
+export interface ScoreLeaderboardResponse {
+  items: ScoreLeaderboardItem[];
+}
+
+export interface FinanceLeaderboardResponse {
+  items: FinanceLeaderboardItem[];
+}
+
+export interface DataExportResponse {
+  items: DevicePayload[];
+}
+
+export interface DataImportError {
+  index: number;
+  name: string | null;
+  reason: string;
+}
+
+export interface DataImportResponse {
+  total: number;
+  created: number;
+  skipped: number;
+  errors: DataImportError[];
 }
 
 export const CATEGORY_LABELS: Record<DeviceCategory, string> = {
@@ -127,17 +196,30 @@ export const STATUS_LABELS: Record<DeviceStatus, string> = {
   holding: "持有中",
   for_sale: "待售",
   sold: "已售",
-  archived: "归档",
-  pending: "待确认",
   broken: "已损坏"
 };
 
-export const RATING_LABELS: Record<DeviceRating, string> = {
+export const RATING_LABELS: Record<RatingLabel, string> = {
   god: "神",
   excellent: "极佳",
   average: "中规中矩",
-  low: "低",
-  special: "特殊状态"
+  low: "低"
+};
+
+export const MOUNT_SYSTEM_LABELS: Record<MountSystemKey, string> = {
+  none: "无",
+  fe: "FE",
+  e: "E",
+  ef: "EF",
+  ef_s: "EF-S",
+  z: "Z",
+  rf: "RF",
+  x: "X",
+  gfx: "GFX",
+  l: "L",
+  m43: "M43",
+  m42: "M42",
+  other: "其他（可输入）"
 };
 
 export const DEFAULT_FILTERS: DeviceFilters = {
@@ -145,6 +227,8 @@ export const DEFAULT_FILTERS: DeviceFilters = {
   category: "",
   status: "",
   rating: "",
-  sortBy: "updated_at",
+  feelingOnly: false,
+  purchaseYear: "",
+  sortBy: "purchase_date",
   sortOrder: "desc"
 };

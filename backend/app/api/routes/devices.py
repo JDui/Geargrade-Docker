@@ -15,8 +15,10 @@ def list_devices(
     search: str | None = Query(default=None),
     category: str | None = Query(default=None),
     status_filter: str | None = Query(default=None, alias="status"),
-    rating: str | None = Query(default=None),
-    sort_by: str = Query(default="updated_at"),
+    rating_label: str | None = Query(default=None),
+    purchase_year: int | None = Query(default=None, ge=1900, le=3000),
+    feeling_only: bool | None = Query(default=None, alias="feeling_only"),
+    sort_by: str = Query(default="purchase_date"),
     sort_order: str = Query(default="desc"),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
@@ -27,7 +29,9 @@ def list_devices(
         search=search,
         category=category,
         status=status_filter,
-        rating=rating,
+        rating_label=rating_label,
+        purchase_year=purchase_year,
+        feeling_only=feeling_only,
         sort_by=sort_by,  # type: ignore[arg-type]
         sort_order=sort_order,  # type: ignore[arg-type]
     )

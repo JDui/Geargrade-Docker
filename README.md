@@ -12,11 +12,18 @@ Geargrade 是一个面向个人摄影器材管理的自托管 Web 应用，重�
 ## 当前 MVP 能力
 
 - 设备增删改查
-- 首页 Dashboard 统计卡片
+- 顶栏全局统计：当前持有、已售设备、正在感受
 - 卡片视图 / 表格视图切换
+- 表格视图表头排序
 - 右侧抽屉设备详情
-- 按关键词、类别、状态、评价筛选
-- 按购入时间、售出时间、价格、等级、更新时间排序
+- 按关键词、类别、状态、评价等级、购入年份筛选
+- 按购入时间、售出时间、价格、分数、更新时间排序
+- 数字评分映射评价体系，`score = -1` 表示“正在感受”
+- 第几次购入的角标展示
+- 卡口 / 系统预设选项与自定义输入
+- 排行榜页面: 榜单切换 + 升降序切换 + 3-2-1 天梯榜 podium
+- 结构化 JSON 导入导出
+- 亮色 / 暗色主题切换
 - 本地图片上传
 - 远程图片 URL 下载并缓存到本地
 - 示例数据自动初始化
@@ -26,7 +33,10 @@ Geargrade 是一个面向个人摄影器材管理的自托管 Web 应用，重�
 ```text
 backend/   FastAPI + SQLAlchemy API
 frontend/  React + Vite 界面
+templates/ 导入模板与示例数据
 ```
+
+源码保持前后端分离；运行时则合并为单容器，由 FastAPI 同时提供 API、媒体文件和前端打包后的静态资源。
 
 ## 本地开发
 
@@ -101,8 +111,9 @@ http://localhost:8080
 
 ## 数据与媒体持久化
 
-Docker Compose 使用两个命名卷:
+Docker Compose 运行时使用一个应用容器和两个命名卷:
 
+- `geargrade-app`: 唯一运行容器，内部同时承载 FastAPI 和前端静态资源
 - `geargrade_data`: SQLite 数据文件
 - `geargrade_media`: 上传图片和远程缓存图片
 
@@ -115,9 +126,34 @@ Docker Compose 使用两个命名卷:
 - `POST /api/v1/devices`
 - `PATCH /api/v1/devices/{id}`
 - `DELETE /api/v1/devices/{id}`
+- `GET /api/v1/leaderboards/holding-duration`
+- `GET /api/v1/leaderboards/score`
+- `GET /api/v1/leaderboards/finance`
+- `GET /api/v1/data/export`
+- `POST /api/v1/data/import`
 - `POST /api/v1/media/upload`
 - `POST /api/v1/media/cache-remote`
 - `POST /api/v1/bootstrap/sample-data`
+
+## 评分与状态规则
+
+- `score = -1`: 正在感受，不参与评级分布和评分榜
+- `score = 0-49`: 低
+- `score = 50-79`: 中规中矩
+- `score = 80-100`: 极佳
+- `score > 100`: 神
+- `holding` / `for_sale`: 自动清空售出价格和售出日期
+- `broken`: 售出价格自动记为 `0`，售出日期为空
+- 状态枚举只包含: `holding`, `for_sale`, `sold`, `broken`
+
+## 导入导出
+
+- 导出接口返回结构化 JSON，可直接再次导入
+- 导入接口采用“先去重，再追加”
+- 去重键: `brand + name + acquisition_iteration + purchase_date`
+- 模板文件:
+  - [device-import.template.json](C:\Users\RinSousei\Desktop\Geargarde-c\Geargrade-Docker\templates\device-import.template.json)
+  - [device-import.example.json](C:\Users\RinSousei\Desktop\Geargarde-c\Geargrade-Docker\templates\device-import.example.json)
 
 ## 测试
 
