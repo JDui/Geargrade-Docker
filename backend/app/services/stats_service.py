@@ -1,16 +1,40 @@
 from collections import Counter
 
-from sqlalchemy import func, select
+from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
-from app.core.enums import DeviceCategory, DeviceStatus, RatingLabel, is_feeling_score, rating_label_from_score
+from app.core.enums import (
+    DeviceCategory,
+    DeviceStatus,
+    RatingLabel,
+    is_feeling_score,
+    rating_label_from_score,
+)
 from app.models.device import Device
-from app.schemas.dashboard import CountBucket, DashboardSummary
+from app.schemas.dashboard import CountBucket, DashboardSummary, PurchaseYearBucket
 
 
 def _count_by_enum(session: Session, column, enum_cls) -> list[CountBucket]:
     counts = dict(session.execute(select(column, func.count(Device.id)).group_by(column)).all())
     return [CountBucket(key=enum_value, count=counts.get(enum_value, 0)) for enum_value in enum_cls]
+
+
+def _purchase_years(session: Session) -> list[PurchaseYearBucket]:
+    rows = session.execute(
+        select(extract("year", Device.purchase_date), func.count(Device.id))
+        .where(
+            Device.purchase_date.is_not(None),
+            Device.category != DeviceCategory.ACCESSORY,
+        )
+        .group_by(extract("year", Device.purchase_date))
+        .order_by(extract("year", Device.purchase_date).asc())
+    ).all()
+
+    return [
+        PurchaseYearBucket(year=int(year), count=count)
+        for year, count in rows
+        if year is not None
+    ]
 
 
 def get_dashboard_summary(session: Session) -> DashboardSummary:
@@ -22,14 +46,20 @@ def get_dashboard_summary(session: Session) -> DashboardSummary:
 
     scores = session.scalars(select(Device.score)).all()
     rating_counter = Counter(
-        label for score in scores if not is_feeling_score(score) for label in [rating_label_from_score(score)] if label is not None
+        label
+        for score in scores
+        if not is_feeling_score(score)
+        for label in [rating_label_from_score(score)]
+        if label is not None
     )
     ratings = [CountBucket(key=label, count=rating_counter.get(label, 0)) for label in RatingLabel]
     categories = _count_by_enum(session, Device.category, DeviceCategory)
+
     return DashboardSummary(
         currently_owned_count=currently_owned_count,
         sold_count=sold_count,
         feeling_in_progress_count=feeling_in_progress_count,
         ratings=ratings,
         categories=categories,
+        purchase_years=_purchase_years(session),
     )

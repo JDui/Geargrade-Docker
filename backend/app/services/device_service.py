@@ -67,6 +67,27 @@ def serialize_device(device: Device, settings: Settings, detailed: bool = False)
     return DeviceListItem(**payload)
 
 
+def _score_ranking_key(device: Device) -> tuple[int, float, str]:
+    return (
+        -device.score,
+        -(device.updated_at.timestamp() if device.updated_at else 0),
+        device.name.lower(),
+    )
+
+
+def get_score_rank(session: Session, device: Device) -> int | None:
+    if device.score < 0:
+        return None
+
+    ranked_devices = session.scalars(select(Device).where(Device.score >= 0)).all()
+    ranked_devices = sorted(ranked_devices, key=_score_ranking_key)
+
+    for index, candidate in enumerate(ranked_devices, 1):
+        if candidate.id == device.id:
+            return index
+    return None
+
+
 def export_device_payload(device: Device) -> DeviceCreate:
     return DeviceCreate(
         name=device.name,

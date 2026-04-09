@@ -44,6 +44,7 @@ describe("AppRouter", () => {
                 { key: "average", count: 0 },
                 { key: "low", count: 0 }
               ],
+              purchase_years: [{ year: 2023, count: 1 }],
               categories: [
                 { key: "camera_body", count: 1 },
                 { key: "lens", count: 0 },
@@ -70,6 +71,7 @@ describe("AppRouter", () => {
               status: "holding",
               score: 103,
               rating_label: "god",
+              score_rank: 1,
               acquisition_iteration: 1,
               tags: ["旗舰"],
               purchase_price: 12500,

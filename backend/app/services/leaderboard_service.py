@@ -14,6 +14,7 @@ from app.schemas.leaderboard import (
     ScoreLeaderboardItem,
     ScoreLeaderboardResponse,
 )
+from app.services.device_service import _score_ranking_key
 
 
 ACTIVE_STATUSES = {DeviceStatus.HOLDING, DeviceStatus.FOR_SALE}
@@ -59,14 +60,11 @@ def get_holding_duration_leaderboard(session: Session, sort_order: SortOrder = "
 def get_score_leaderboard(session: Session, sort_order: SortOrder = "desc") -> ScoreLeaderboardResponse:
     devices = session.scalars(select(Device).where(Device.score >= 0)).all()
     if sort_order == "desc":
-        devices = sorted(
-            devices,
-            key=lambda device: (-device.score, -(device.updated_at.timestamp() if device.updated_at else 0), device.name.lower()),
-        )
+        devices = sorted(devices, key=_score_ranking_key)
     else:
         devices = sorted(
             devices,
-            key=lambda device: (device.score, device.updated_at.timestamp() if device.updated_at else 0, device.name.lower()),
+            key=lambda device: (-_score_ranking_key(device)[0], -_score_ranking_key(device)[1], _score_ranking_key(device)[2]),
         )
     items = [
         ScoreLeaderboardItem(

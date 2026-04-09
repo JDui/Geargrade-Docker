@@ -70,7 +70,9 @@ export function DeviceCard({ device }: { device: DeviceListItem }) {
                   </span>
                 ) : null}
                 {feeling ? (
-                  <span className="rounded-full bg-accent/12 px-2.5 py-1 text-xs font-medium text-accent">正在感受</span>
+                  <span className="rounded-full bg-accent/12 px-2.5 py-1 text-xs font-medium text-accent">
+                    正在感受
+                  </span>
                 ) : null}
               </div>
             </div>
@@ -83,7 +85,9 @@ export function DeviceCard({ device }: { device: DeviceListItem }) {
                 {STATUS_LABELS[device.status]}
               </span>
               {device.mount_system_label ? (
-                <span className="rounded-full bg-panelAlt px-2.5 py-1 text-textSecondary">{device.mount_system_label}</span>
+                <span className="rounded-full bg-panelAlt px-2.5 py-1 text-textSecondary">
+                  {device.mount_system_label}
+                </span>
               ) : null}
             </div>
           </div>

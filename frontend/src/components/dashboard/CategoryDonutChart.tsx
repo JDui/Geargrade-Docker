@@ -43,9 +43,9 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
               }}
               formatter={(value: number, _name, props) => {
                 const payload = props?.payload as { label?: string; percent?: number } | undefined;
-                const label = payload?.label ?? "类别";
+                const label = payload?.label ?? "未知类别";
                 const percent = payload?.percent ?? 0;
-                return [`${label} · ${value} (${percent}%)`, "数量"];
+                return [`${value} 台`, `${label} · ${percent}%`];
               }}
               labelFormatter={() => "设备类别"}
               labelStyle={{ color: "rgb(var(--color-text-primary))" }}

@@ -92,7 +92,7 @@ export function DeviceFiltersBar({
             })
           }
         >
-          <option value="">所有评级</option>
+          <option value="">所有评价</option>
           {Object.entries(RATING_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}

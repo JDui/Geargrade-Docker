@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMatch } from "react-router-dom";
 
 import { fetchDevices } from "../api/devices";
+import { AnnualPurchaseChart } from "../components/dashboard/AnnualPurchaseChart";
 import { CategoryDonutChart } from "../components/dashboard/CategoryDonutChart";
 import { RatingBarChart } from "../components/dashboard/RatingBarChart";
 import { DeviceCard } from "../components/devices/DeviceCard";
@@ -80,19 +81,34 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 xl:grid-cols-[1.1fr,1fr]">
-        <section className="panel p-5">
-          <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
-            评价等级分布
-          </div>
-          <div className="mt-4">
-            {summary ? (
-              <RatingBarChart data={summary.ratings} />
-            ) : (
-              <div className="text-textSecondary">加载中...</div>
-            )}
-          </div>
-        </section>
+      <section className="grid gap-4 xl:grid-cols-[1.08fr,1fr]">
+        <div className="grid gap-4">
+          <section className="panel p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
+              评价等级分布
+            </div>
+            <div className="mt-4">
+              {summary ? (
+                <RatingBarChart data={summary.ratings} />
+              ) : (
+                <div className="text-textSecondary">加载中...</div>
+              )}
+            </div>
+          </section>
+
+          <section className="panel p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
+              年度购买量
+            </div>
+            <div className="mt-4">
+              {summary ? (
+                <AnnualPurchaseChart data={summary.purchase_years} />
+              ) : (
+                <div className="text-textSecondary">加载中...</div>
+              )}
+            </div>
+          </section>
+        </div>
 
         <section className="panel p-5">
           <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
@@ -118,9 +134,7 @@ export default function DashboardPage() {
       <section className="flex items-center justify-between">
         <div>
           <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">设备库</div>
-          <h1 className="mt-1 text-2xl font-semibold text-textPrimary">
-            共 {total} 条设备档案
-          </h1>
+          <h1 className="mt-1 text-2xl font-semibold text-textPrimary">共 {total} 条设备档案</h1>
         </div>
       </section>
 
@@ -161,6 +175,7 @@ export default function DashboardPage() {
       {drawerMatch?.params.deviceId ? (
         <DeviceDetailDrawer
           deviceId={drawerMatch.params.deviceId}
+          closeTo="/"
           onChanged={() => {
             loadDevices(effectiveFilters).catch(() => undefined);
             refreshSummary().catch(() => undefined);

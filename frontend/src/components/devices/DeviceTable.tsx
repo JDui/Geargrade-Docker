@@ -71,9 +71,7 @@ export function DeviceTable({
                   onClick={() => navigate(`/devices/${device.id}`)}
                 >
                   <td className="px-4 py-4">
-                    <div className="font-medium text-textPrimary">
-                      {formatDeviceTitle(device)}
-                    </div>
+                    <div className="font-medium text-textPrimary">{formatDeviceTitle(device)}</div>
                     <div className="text-xs text-textSecondary">{device.brand}</div>
                   </td>
                   <td className="px-4 py-4">{CATEGORY_LABELS[device.category]}</td>

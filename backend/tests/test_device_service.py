@@ -1,7 +1,7 @@
 from app.core.config import Settings
 from app.core.enums import DeviceCategory, DeviceStatus, MountSystemKey
 from app.schemas.device import DeviceCreate, DeviceUpdate
-from app.services.device_service import create_device, get_device, list_devices, update_device
+from app.services.device_service import create_device, get_device, get_score_rank, list_devices, update_device
 
 
 def test_create_and_update_device(session):
@@ -163,3 +163,53 @@ def test_status_rules_normalize_sale_fields(session):
     )
     assert broken.sale_date is None
     assert broken.sale_price == 0
+
+
+def test_score_rank_matches_score_leaderboard_order(session):
+    settings = Settings(media_root="data/media")
+    first = create_device(
+        session,
+        DeviceCreate(
+            name="A Device",
+            brand="Brand",
+            category=DeviceCategory.CAMERA_BODY,
+            status=DeviceStatus.HOLDING,
+            score=88,
+            acquisition_iteration=1,
+            review_detail="test",
+            purchase_date="2026-01-01",
+        ),
+        settings,
+    )
+    second = create_device(
+        session,
+        DeviceCreate(
+            name="B Device",
+            brand="Brand",
+            category=DeviceCategory.LENS,
+            status=DeviceStatus.HOLDING,
+            score=96,
+            acquisition_iteration=1,
+            review_detail="test",
+            purchase_date="2026-01-02",
+        ),
+        settings,
+    )
+    feeling = create_device(
+        session,
+        DeviceCreate(
+            name="Feeling Device",
+            brand="Brand",
+            category=DeviceCategory.OTHER,
+            status=DeviceStatus.HOLDING,
+            score=-1,
+            acquisition_iteration=1,
+            review_detail="test",
+            purchase_date="2026-01-03",
+        ),
+        settings,
+    )
+
+    assert get_score_rank(session, second) == 1
+    assert get_score_rank(session, first) == 2
+    assert get_score_rank(session, feeling) is None

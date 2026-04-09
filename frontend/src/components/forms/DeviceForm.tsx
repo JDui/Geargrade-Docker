@@ -199,8 +199,8 @@ export function DeviceForm({
               `-1` 表示正在感受，不参与评分统计。
             </p>
             <p className="mt-1 text-sm text-textSecondary">
-              当前映射:{" "}
-              <span className="font-medium text-textPrimary">
+              当前映射：
+              <span className="ml-1 font-medium text-textPrimary">
                 {isFeelingScore(scoreValue) ? "正在感受" : ratingLabelText(scoreToRatingLabel(scoreValue))}
               </span>
             </p>
@@ -303,13 +303,25 @@ export function DeviceForm({
       <section className="panel p-5">
         <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">设备图片</div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <button type="button" className={imageMode === "none" ? "button-primary" : "button-secondary"} onClick={() => onImageModeChange("none")}>
+          <button
+            type="button"
+            className={imageMode === "none" ? "button-primary" : "button-secondary"}
+            onClick={() => onImageModeChange("none")}
+          >
             不设置图片
           </button>
-          <button type="button" className={imageMode === "upload" ? "button-primary" : "button-secondary"} onClick={() => onImageModeChange("upload")}>
+          <button
+            type="button"
+            className={imageMode === "upload" ? "button-primary" : "button-secondary"}
+            onClick={() => onImageModeChange("upload")}
+          >
             本地上传
           </button>
-          <button type="button" className={imageMode === "remote" ? "button-primary" : "button-secondary"} onClick={() => onImageModeChange("remote")}>
+          <button
+            type="button"
+            className={imageMode === "remote" ? "button-primary" : "button-secondary"}
+            onClick={() => onImageModeChange("remote")}
+          >
             远程 URL 缓存
           </button>
         </div>
@@ -317,14 +329,24 @@ export function DeviceForm({
         {imageMode === "upload" ? (
           <div className="mt-4">
             <label className="field-label">上传文件</label>
-            <input className="field" type="file" accept="image/*" onChange={(event) => onUploadChange(event.target.files?.[0] ?? null)} />
+            <input
+              className="field"
+              type="file"
+              accept="image/*"
+              onChange={(event) => onUploadChange(event.target.files?.[0] ?? null)}
+            />
           </div>
         ) : null}
 
         {imageMode === "remote" ? (
           <div className="mt-4">
             <label className="field-label">远程图片 URL</label>
-            <input className="field" value={remoteUrl} onChange={(event) => onRemoteUrlChange(event.target.value)} placeholder="https://example.com/device.jpg" />
+            <input
+              className="field"
+              value={remoteUrl}
+              onChange={(event) => onRemoteUrlChange(event.target.value)}
+              placeholder="https://example.com/device.jpg"
+            />
           </div>
         ) : null}
       </section>

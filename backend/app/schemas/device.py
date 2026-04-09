@@ -137,6 +137,7 @@ class DeviceListItem(BaseModel):
 
 
 class DeviceDetail(DeviceListItem):
+    score_rank: int | None = None
     pros: list[str]
     cons: list[str]
     review_detail: str

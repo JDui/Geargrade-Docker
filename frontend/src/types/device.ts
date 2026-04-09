@@ -66,6 +66,7 @@ export interface DeviceListItem {
 }
 
 export interface DeviceDetail extends DeviceListItem {
+  score_rank: number | null;
   pros: string[];
   cons: string[];
   review_detail: string;
@@ -110,6 +111,7 @@ export interface DashboardSummary {
   feeling_in_progress_count: number;
   ratings: DashboardBucket<RatingLabel>[];
   categories: DashboardBucket<DeviceCategory>[];
+  purchase_years: Array<{ year: number; count: number }>;
 }
 
 export interface MediaAsset {

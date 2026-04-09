@@ -15,6 +15,15 @@ function DashboardLayout() {
   );
 }
 
+function LeaderboardsLayout() {
+  return (
+    <>
+      <LeaderboardsPage />
+      <Outlet />
+    </>
+  );
+}
+
 export function AppRouter() {
   return (
     <Routes>
@@ -22,7 +31,9 @@ export function AppRouter() {
         <Route path="/" element={<DashboardLayout />}>
           <Route path="devices/:deviceId" element={null} />
         </Route>
-        <Route path="/leaderboards" element={<LeaderboardsPage />} />
+        <Route path="/leaderboards" element={<LeaderboardsLayout />}>
+          <Route path="devices/:deviceId" element={null} />
+        </Route>
         <Route path="/data-tools" element={<DataToolsPage />} />
         <Route path="/devices/new" element={<DeviceFormPage mode="create" />} />
         <Route path="/devices/:deviceId/edit" element={<DeviceFormPage mode="edit" />} />

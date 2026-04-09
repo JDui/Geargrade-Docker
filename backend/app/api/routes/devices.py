@@ -47,7 +47,9 @@ def get_device(
     device = device_service.get_device(db, device_id)
     if device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
-    return device_service.serialize_device(device, settings, detailed=True)
+    detail = device_service.serialize_device(device, settings, detailed=True)
+    detail.score_rank = device_service.get_score_rank(db, device)
+    return detail
 
 
 @router.post("", response_model=DeviceDetail, status_code=status.HTTP_201_CREATED)
@@ -57,7 +59,9 @@ def create_device(
     settings: Settings = Depends(get_settings),
 ) -> DeviceDetail:
     device = device_service.create_device(db, payload, settings)
-    return device_service.serialize_device(device, settings, detailed=True)
+    detail = device_service.serialize_device(device, settings, detailed=True)
+    detail.score_rank = device_service.get_score_rank(db, device)
+    return detail
 
 
 @router.patch("/{device_id}", response_model=DeviceDetail)
@@ -71,7 +75,9 @@ def update_device(
     if device is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Device not found.")
     updated = device_service.update_device(db, device, payload, settings)
-    return device_service.serialize_device(updated, settings, detailed=True)
+    detail = device_service.serialize_device(updated, settings, detailed=True)
+    detail.score_rank = device_service.get_score_rank(db, updated)
+    return detail
 
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)

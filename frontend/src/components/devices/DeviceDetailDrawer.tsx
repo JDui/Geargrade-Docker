@@ -8,10 +8,15 @@ import { formatDeviceTitle, isFeelingScore, ratingLabelText } from "../../utils/
 
 interface DeviceDetailDrawerProps {
   deviceId: string;
+  closeTo?: string;
   onChanged: () => void;
 }
 
-export function DeviceDetailDrawer({ deviceId, onChanged }: DeviceDetailDrawerProps) {
+export function DeviceDetailDrawer({
+  deviceId,
+  closeTo = "/",
+  onChanged
+}: DeviceDetailDrawerProps) {
   const navigate = useNavigate();
   const [device, setDevice] = useState<DeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,17 +55,24 @@ export function DeviceDetailDrawer({ deviceId, onChanged }: DeviceDetailDrawerPr
     }
     await deleteDevice(deviceId);
     onChanged();
-    navigate("/");
+    navigate(closeTo);
   }
 
   const feeling = device ? isFeelingScore(device.score) : false;
+  const scoreRankText = !device
+    ? "--"
+    : feeling
+      ? "感受中，不参与评分榜"
+      : device.score_rank != null
+        ? `#${device.score_rank}`
+        : "未上榜";
 
   return (
     <>
       <button
         type="button"
         className="fixed inset-0 z-40 bg-black/35 backdrop-blur-[2px]"
-        onClick={() => navigate("/")}
+        onClick={() => navigate(closeTo)}
         aria-label="关闭详情"
       />
       <aside className="fixed right-0 top-0 z-50 h-full w-full max-w-xl border-l border-line bg-surface/95 shadow-panel">
@@ -68,16 +80,22 @@ export function DeviceDetailDrawer({ deviceId, onChanged }: DeviceDetailDrawerPr
           <div className="flex items-center justify-between border-b border-line px-6 py-5">
             <div>
               <div className="text-xs uppercase tracking-[0.22em] text-accent/80">设备详情</div>
-              <h2 className="mt-1 text-2xl font-semibold text-textPrimary">{device ? formatDeviceTitle(device) : "加载中..."}</h2>
+              <h2 className="mt-1 text-2xl font-semibold text-textPrimary">
+                {device ? formatDeviceTitle(device) : "加载中..."}
+              </h2>
             </div>
-            <button type="button" className="button-secondary" onClick={() => navigate("/")}>
+            <button type="button" className="button-secondary" onClick={() => navigate(closeTo)}>
               关闭
             </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-6 py-6">
             {loading ? <div className="text-textSecondary">正在加载设备详情...</div> : null}
-            {error ? <div className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-danger">{error}</div> : null}
+            {error ? (
+              <div className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-danger">
+                {error}
+              </div>
+            ) : null}
 
             {!loading && !error && device ? (
               <div className="space-y-6">
@@ -115,23 +133,35 @@ export function DeviceDetailDrawer({ deviceId, onChanged }: DeviceDetailDrawerPr
                       <div>第 {device.acquisition_iteration} 次</div>
                     </div>
                     <div>
-                      <div className="text-textSecondary">评价状态</div>
-                      <div>{feeling ? "正在感受" : "已形成判断"}</div>
+                      <div className="text-textSecondary">榜单名次（评分榜）</div>
+                      <div>{scoreRankText}</div>
                     </div>
                   </div>
                 </section>
 
                 <section className="panel p-4">
-                  <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">主观评价系统</div>
+                  <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">
+                    主观评价系统
+                  </div>
                   <div className="mt-4 grid gap-4 sm:grid-cols-[1fr,1fr]">
                     <div className="rounded-2xl bg-panelAlt p-4">
-                      <div className="text-xs uppercase tracking-[0.16em] text-textSecondary">数字评分</div>
-                      <div className="mt-2 text-3xl font-semibold text-textPrimary">{feeling ? "感受中" : device.score}</div>
-                      <div className="mt-1 text-sm text-textSecondary">{ratingLabelText(device.rating_label)}</div>
+                      <div className="text-xs uppercase tracking-[0.16em] text-textSecondary">
+                        数字评分
+                      </div>
+                      <div className="mt-2 text-3xl font-semibold text-textPrimary">
+                        {feeling ? "感受中" : device.score}
+                      </div>
+                      <div className="mt-1 text-sm text-textSecondary">
+                        {ratingLabelText(device.rating_label)}
+                      </div>
                     </div>
                     <div className="rounded-2xl bg-panelAlt p-4">
-                      <div className="text-xs uppercase tracking-[0.16em] text-textSecondary">当前状态</div>
-                      <div className="mt-2 text-lg font-semibold text-textPrimary">{feeling ? "正在感受" : "已形成判断"}</div>
+                      <div className="text-xs uppercase tracking-[0.16em] text-textSecondary">
+                        评分状态
+                      </div>
+                      <div className="mt-2 text-lg font-semibold text-textPrimary">
+                        {feeling ? "正在感受" : "已形成判断"}
+                      </div>
                     </div>
                   </div>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -150,12 +180,16 @@ export function DeviceDetailDrawer({ deviceId, onChanged }: DeviceDetailDrawerPr
                   </div>
                   <div className="mt-4">
                     <div className="text-sm font-medium text-textPrimary">详细评价</div>
-                    <p className="mt-3 whitespace-pre-line text-sm leading-7 text-textSecondary">{device.review_detail || "暂无详细评价"}</p>
+                    <p className="mt-3 whitespace-pre-line text-sm leading-7 text-textSecondary">
+                      {device.review_detail || "暂无详细评价"}
+                    </p>
                   </div>
                 </section>
 
                 <section className="panel p-4">
-                  <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">财务与时间记录</div>
+                  <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">
+                    财务与时间记录
+                  </div>
                   <div className="mt-4 grid gap-4 text-sm text-textPrimary sm:grid-cols-2">
                     <div className="rounded-2xl bg-panelAlt p-4">
                       <div className="text-textSecondary">购入价格</div>
