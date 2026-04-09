@@ -13,6 +13,7 @@ import {
 interface DeviceFiltersBarProps {
   filters: DeviceFilters;
   viewMode: ViewMode;
+  availablePurchaseYears: number[];
   onFiltersChange: (next: DeviceFilters) => void;
   onViewModeChange: (next: ViewMode) => void;
 }
@@ -33,150 +34,174 @@ const sortOptions = [
 export function DeviceFiltersBar({
   filters,
   viewMode,
+  availablePurchaseYears,
   onFiltersChange,
   onViewModeChange
 }: DeviceFiltersBarProps) {
   return (
     <section className="panel sticky top-[132px] z-30 p-4 xl:top-[92px]">
-      <div className="grid gap-3 lg:grid-cols-[minmax(220px,2fr),repeat(5,minmax(0,1fr)),auto]">
-        <input
-          className="field"
-          placeholder="搜索名称、品牌、标签、详细评价..."
-          value={filters.search}
-          onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
-        />
+      <div className="space-y-3">
+        <div className="grid gap-3 lg:grid-cols-[minmax(220px,2fr),repeat(5,minmax(0,1fr)),auto]">
+          <input
+            className="field"
+            placeholder="搜索名称、品牌、标签、详细评价..."
+            value={filters.search}
+            onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
+          />
 
-        <select
-          className="field"
-          value={filters.category}
-          onChange={(event) =>
-            onFiltersChange({
-              ...filters,
-              category: event.target.value as DeviceCategory | ""
-            })
-          }
-        >
-          <option value="">所有类别</option>
-          {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="field"
-          value={filters.status}
-          onChange={(event) =>
-            onFiltersChange({
-              ...filters,
-              status: event.target.value as DeviceStatus | ""
-            })
-          }
-        >
-          <option value="">所有状态</option>
-          {Object.entries(STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="field"
-          value={filters.rating}
-          onChange={(event) =>
-            onFiltersChange({
-              ...filters,
-              rating: event.target.value as RatingLabel | ""
-            })
-          }
-        >
-          <option value="">所有评价</option>
-          {Object.entries(RATING_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="field"
-          value={filters.feelingOnly ? "true" : ""}
-          onChange={(event) =>
-            onFiltersChange({
-              ...filters,
-              feelingOnly: event.target.value === "true"
-            })
-          }
-        >
-          <option value="">感受状态</option>
-          <option value="true">仅正在感受</option>
-        </select>
-
-        <input
-          className="field"
-          placeholder="购入年份"
-          inputMode="numeric"
-          value={filters.purchaseYear}
-          onChange={(event) =>
-            onFiltersChange({
-              ...filters,
-              purchaseYear: event.target.value.replace(/[^\d]/g, "").slice(0, 4)
-            })
-          }
-        />
-
-        <div className="flex items-center gap-2 justify-self-end">
-          {viewMode === "cards" ? (
-            <>
-              <select
-                className="field min-w-[132px]"
-                value={filters.sortBy}
-                onChange={(event) =>
-                  onFiltersChange({ ...filters, sortBy: event.target.value as DeviceFilters["sortBy"] })
-                }
-              >
-                {sortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                className="field min-w-[96px]"
-                value={filters.sortOrder}
-                onChange={(event) =>
-                  onFiltersChange({
-                    ...filters,
-                    sortOrder: event.target.value as DeviceFilters["sortOrder"]
-                  })
-                }
-              >
-                <option value="desc">降序</option>
-                <option value="asc">升序</option>
-              </select>
-            </>
-          ) : null}
-
-          <button
-            className={viewMode === "cards" ? "button-primary" : "button-secondary"}
-            type="button"
-            onClick={() => onViewModeChange("cards")}
+          <select
+            className="field"
+            value={filters.category}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                category: event.target.value as DeviceCategory | ""
+              })
+            }
           >
-            卡片
-          </button>
-          <button
-            className={viewMode === "table" ? "button-primary" : "button-secondary"}
-            type="button"
-            onClick={() => onViewModeChange("table")}
+            <option value="">所有类别</option>
+            {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="field"
+            value={filters.status}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                status: event.target.value as DeviceStatus | ""
+              })
+            }
           >
-            表格
-          </button>
-          <button className="button-secondary" type="button" onClick={() => onFiltersChange(DEFAULT_FILTERS)}>
-            重置
-          </button>
+            <option value="">所有状态</option>
+            {Object.entries(STATUS_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="field"
+            value={filters.rating}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                rating: event.target.value as RatingLabel | ""
+              })
+            }
+          >
+            <option value="">所有评价</option>
+            {Object.entries(RATING_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="field"
+            value={filters.feelingOnly ? "true" : ""}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                feelingOnly: event.target.value === "true"
+              })
+            }
+          >
+            <option value="">感受状态</option>
+            <option value="true">仅正在感受</option>
+          </select>
+
+          <select
+            className="field"
+            value={filters.purchaseYear}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                purchaseYear: event.target.value
+              })
+            }
+          >
+            <option value="">所有年份</option>
+            {availablePurchaseYears.map((year) => (
+              <option key={year} value={String(year)}>
+                {year}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center justify-self-end">
+            <button
+              className="button-secondary w-full lg:w-auto"
+              type="button"
+              onClick={() => onFiltersChange(DEFAULT_FILTERS)}
+            >
+              重置
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-panelAlt/50 px-3 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="px-1 text-xs uppercase tracking-[0.18em] text-textSecondary">
+              排序
+            </span>
+            <select
+              className="field min-w-[144px]"
+              value={filters.sortBy}
+              onChange={(event) =>
+                onFiltersChange({
+                  ...filters,
+                  sortBy: event.target.value as DeviceFilters["sortBy"]
+                })
+              }
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              className="field min-w-[96px]"
+              value={filters.sortOrder}
+              onChange={(event) =>
+                onFiltersChange({
+                  ...filters,
+                  sortOrder: event.target.value as DeviceFilters["sortOrder"]
+                })
+              }
+            >
+              <option value="desc">降序</option>
+              <option value="asc">升序</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="px-1 text-xs uppercase tracking-[0.18em] text-textSecondary">
+              视图
+            </span>
+            <button
+              className={viewMode === "cards" ? "button-primary" : "button-secondary"}
+              type="button"
+              onClick={() => onViewModeChange("cards")}
+            >
+              卡片
+            </button>
+            <button
+              className={viewMode === "table" ? "button-primary" : "button-secondary"}
+              type="button"
+              onClick={() => onViewModeChange("table")}
+            >
+              表格
+            </button>
+          </div>
         </div>
       </div>
     </section>

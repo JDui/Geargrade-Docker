@@ -41,6 +41,21 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const availablePurchaseYears = useMemo(() => {
+    const years = (summary?.purchase_years ?? []).map((item) => item.year);
+    if (!years.length) {
+      return [];
+    }
+
+    const minYear = Math.min(...years);
+    const maxYear = Math.max(...years);
+    const options: number[] = [];
+    for (let year = maxYear; year >= minYear; year -= 1) {
+      options.push(year);
+    }
+    return options;
+  }, [summary]);
+
   function handleTableSort(nextSortBy: DeviceFilters["sortBy"]) {
     setFilters((current) => ({
       ...current,
@@ -127,6 +142,7 @@ export default function DashboardPage() {
       <DeviceFiltersBar
         filters={filters}
         viewMode={viewMode}
+        availablePurchaseYears={availablePurchaseYears}
         onFiltersChange={setFilters}
         onViewModeChange={handleViewModeChange}
       />

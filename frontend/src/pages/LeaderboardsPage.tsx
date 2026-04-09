@@ -26,6 +26,9 @@ type RankedEntry = {
   meta: string;
 };
 
+const VALID_TABS: LeaderboardTab[] = ["holding-duration", "score", "finance"];
+const VALID_SORTS: SortOrder[] = ["desc", "asc"];
+
 function tabLabel(tab: LeaderboardTab) {
   return {
     "holding-duration": "持有时间榜",
@@ -146,8 +149,16 @@ export default function LeaderboardsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const drawerMatch = useMatch("/leaderboards/devices/:deviceId");
-  const tab = (searchParams.get("tab") as LeaderboardTab | null) ?? "score";
-  const sortOrder = (searchParams.get("sort_order") as SortOrder | null) ?? "desc";
+
+  const rawTab = searchParams.get("tab");
+  const rawSort = searchParams.get("sort_order");
+  const tab: LeaderboardTab = VALID_TABS.includes(rawTab as LeaderboardTab)
+    ? (rawTab as LeaderboardTab)
+    : "score";
+  const sortOrder: SortOrder = VALID_SORTS.includes(rawSort as SortOrder)
+    ? (rawSort as SortOrder)
+    : "desc";
+
   const [holdingItems, setHoldingItems] = useState<HoldingDurationItem[]>([]);
   const [scoreItems, setScoreItems] = useState<ScoreLeaderboardItem[]>([]);
   const [financeItems, setFinanceItems] = useState<FinanceLeaderboardItem[]>([]);
@@ -155,15 +166,22 @@ export default function LeaderboardsPage() {
   const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
-    if (!["holding-duration", "score", "finance"].includes(tab)) {
-      setSearchParams({ tab: "score", sort_order: "desc" }, { replace: true });
-      return;
+    const normalized = new URLSearchParams(searchParams);
+    let changed = false;
+
+    if (normalized.get("tab") !== tab) {
+      normalized.set("tab", tab);
+      changed = true;
+    }
+    if (normalized.get("sort_order") !== sortOrder) {
+      normalized.set("sort_order", sortOrder);
+      changed = true;
     }
 
-    if (!["asc", "desc"].includes(sortOrder)) {
-      setSearchParams({ tab, sort_order: "desc" }, { replace: true });
+    if (changed) {
+      setSearchParams(normalized, { replace: true });
     }
-  }, [setSearchParams, sortOrder, tab]);
+  }, [searchParams, setSearchParams, sortOrder, tab]);
 
   useEffect(() => {
     setError(null);
@@ -213,7 +231,7 @@ export default function LeaderboardsPage() {
       <section className="leaderboard-hero panel overflow-hidden p-6">
         <div className="relative">
           <div className="leaderboard-hero-glow" />
-          <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div className="relative z-10 flex flex-wrap items-end justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-[0.24em] text-accent/80">排行榜</div>
               <h1 className="mt-2 text-4xl font-black tracking-tight text-textPrimary">排行榜</h1>
@@ -222,7 +240,7 @@ export default function LeaderboardsPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 rounded-2xl border border-line bg-panelAlt/70 p-1">
+            <div className="relative z-10 flex items-center gap-2 rounded-2xl border border-line bg-panelAlt/70 p-1">
               <button
                 className={sortOrder === "desc" ? "button-primary" : "button-secondary"}
                 type="button"
@@ -240,8 +258,8 @@ export default function LeaderboardsPage() {
             </div>
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            {(["holding-duration", "score", "finance"] as LeaderboardTab[]).map((candidate) => (
+          <div className="relative z-10 mt-6 flex flex-wrap gap-2">
+            {VALID_TABS.map((candidate) => (
               <button
                 key={candidate}
                 className={tab === candidate ? "button-primary" : "button-secondary"}

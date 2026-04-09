@@ -98,6 +98,7 @@ body {
   height: 10rem;
   border-radius: 2rem;
   background: radial-gradient(circle at top, rgba(92, 200, 255, 0.14), transparent 60%);
+  pointer-events: none;
 }
 
 .podium-card {
