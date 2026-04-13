@@ -18,6 +18,7 @@ Geargrade 是一个面向个人摄影器材管理的自托管 Web 应用。它�
 - 评价等级分布
 - 设备类别分布
 - 年度购买量统计（排除配件）
+- 当前持有设备快捷面板
 - 卡片视图 / 表格视图切换
 - 表格表头排序
 - 关键词、类别、状态、评价、购入年份筛选
@@ -38,31 +39,31 @@ Geargrade 是一个面向个人摄影器材管理的自托管 Web 应用。它�
 
 ### 首页总览
 
-首页包含顶栏统计、评价等级分布、设备类别分布、年度购买量和设备库筛选区。
+首页展示当前持有、已售和正在感受的全局统计，以及评价等级分布、设备类别分布、年度购买量和设备库筛选区。
 
 ![首页总览](docs/screenshots/dashboard-home.png)
 
 ### 设备详情抽屉
 
-详情抽屉展示设备基本信息、评分榜名次、主观评价、优缺点和财务时间记录。
+详情抽屉展示设备基础信息、评分榜名次、数字评分主视觉卡、优缺点和财务时间记录，适合在不离开列表页的情况下快速查看完整档案。
 
 ![设备详情抽屉](docs/screenshots/device-detail-drawer.png)
 
 ### 排行榜
 
-排行榜页面支持榜单切换、升降序切换，以及 `2-1-3` podium 的 Top 3 展示。
+排行榜页面支持评分榜、持有时间榜和理财榜切换，并突出展示 Top 3 的 podium 卡片和完整排名列表。
 
 ![排行榜](docs/screenshots/leaderboards-score.png)
 
 ### 数据工具
 
-数据工具页用于导出当前数据、导入结构化 JSON，以及配合模板批量录入设备档案。
+数据工具页用于导出当前数据、导入结构化 JSON，以及配合模板批量整理设备档案。
 
 ![数据工具](docs/screenshots/data-tools.png)
 
 ### 新增设备
 
-新增设备页支持评分、购入次数、卡口系统、状态、图片来源和详细评价录入。
+新增设备页支持录入品牌、类别、卡口系统、数字评分、购入次数、详细评价、价格与图片来源。
 
 ![新增设备](docs/screenshots/device-form.png)
 
@@ -89,7 +90,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Windows PowerShell:
+Windows PowerShell：
 
 ```powershell
 cd backend
@@ -120,7 +121,7 @@ npm run dev
 cp .env.example .env
 ```
 
-Windows PowerShell:
+Windows PowerShell：
 
 ```powershell
 Copy-Item .env.example .env
