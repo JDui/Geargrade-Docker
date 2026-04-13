@@ -87,6 +87,122 @@ body {
   @apply button border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
 }
 
+.sort-toggle {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 8.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgb(var(--color-line));
+  background: rgb(var(--color-panel));
+  padding: 0.1875rem;
+}
+
+.sort-toggle-thumb {
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.1875rem;
+  z-index: 0;
+  height: calc(100% - 0.375rem);
+  width: calc(50% - 0.1875rem);
+  border-radius: 9999px;
+  background: rgba(var(--color-accent), 0.16);
+  border: 1px solid rgba(var(--color-accent), 0.32);
+  transition: transform 180ms ease;
+}
+
+.sort-toggle-option {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--color-text-secondary));
+  padding: 0.45rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sort-toggle-option.is-active {
+  color: rgb(var(--color-text-primary));
+}
+
+.score-hero-card {
+  position: relative;
+  display: flex;
+  min-height: 14.75rem;
+  align-items: stretch;
+  justify-content: space-between;
+  overflow: hidden;
+  border-radius: 1.75rem;
+  border: 1px solid rgba(var(--color-line), 0.9);
+  background:
+    linear-gradient(180deg, rgba(28, 41, 63, 0.94), rgba(17, 25, 38, 0.98)),
+    radial-gradient(circle at top right, rgba(var(--color-accent), 0.18), transparent 46%);
+  padding: 2rem 1.75rem;
+}
+
+.score-hero-copy {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.score-hero-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: rgb(var(--color-text-secondary));
+}
+
+.score-hero-value {
+  margin-top: 1.5rem;
+  font-size: clamp(3.5rem, 7vw, 5.25rem);
+  font-weight: 900;
+  line-height: 0.95;
+  color: rgb(var(--color-text-primary));
+}
+
+.score-hero-meta {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  color: rgb(var(--color-text-secondary));
+}
+
+.score-hero-glyph {
+  pointer-events: none;
+  position: absolute;
+  right: 0.4rem;
+  bottom: -0.55rem;
+  z-index: 0;
+  font-size: clamp(8.5rem, 25vw, 14.5rem);
+  font-weight: 900;
+  line-height: 0.8;
+  color: transparent;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.68) 0%,
+    rgba(255, 255, 255, 0.58) 36%,
+    rgba(255, 255, 255, 0.28) 72%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: blur(0.5px);
+  text-shadow:
+    0 0 14px rgba(255, 255, 255, 0.1),
+    0 12px 24px rgba(0, 0, 0, 0.18);
+  user-select: none;
+}
+
+.score-hero-glyph.is-feeling {
+  right: 0.8rem;
+  font-size: clamp(7rem, 20vw, 10rem);
+}
+
 .leaderboard-hero {
   position: relative;
 }
@@ -208,6 +324,36 @@ body {
 
 :root[data-theme="light"] .leaderboard-hero-glow {
   background: radial-gradient(circle at top, rgba(0, 122, 204, 0.12), transparent 60%);
+}
+
+:root[data-theme="light"] .sort-toggle {
+  background: rgb(var(--color-panel-alt));
+}
+
+:root[data-theme="light"] .sort-toggle-thumb {
+  background: rgba(var(--color-accent), 0.12);
+  border-color: rgba(var(--color-accent), 0.2);
+}
+
+:root[data-theme="light"] .score-hero-card {
+  background:
+    linear-gradient(180deg, rgba(242, 246, 252, 0.98), rgba(232, 239, 248, 0.98)),
+    radial-gradient(circle at top right, rgba(var(--color-accent), 0.1), transparent 46%);
+}
+
+:root[data-theme="light"] .score-hero-glyph {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.34) 0%,
+    rgba(15, 23, 42, 0.26) 36%,
+    rgba(15, 23, 42, 0.12) 72%,
+    rgba(15, 23, 42, 0.01) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 14px rgba(15, 23, 42, 0.05),
+    0 8px 16px rgba(255, 255, 255, 0.8);
 }
 
 :root[data-theme="light"] .podium-card {

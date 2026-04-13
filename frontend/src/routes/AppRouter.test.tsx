@@ -45,6 +45,29 @@ describe("AppRouter", () => {
                 { key: "low", count: 0 }
               ],
               purchase_years: [{ year: 2023, count: 1 }],
+              purchase_year_category_breakdown: [
+                {
+                  year: 2023,
+                  buckets: [
+                    { key: "camera_body", count: 1 },
+                    { key: "lens", count: 0 },
+                    { key: "action_camera", count: 0 },
+                    { key: "drone", count: 0 },
+                    { key: "other", count: 0 }
+                  ]
+                }
+              ],
+              purchase_year_rating_breakdown: [
+                {
+                  year: 2023,
+                  buckets: [
+                    { key: "god", count: 1 },
+                    { key: "excellent", count: 0 },
+                    { key: "average", count: 0 },
+                    { key: "low", count: 0 }
+                  ]
+                }
+              ],
               categories: [
                 { key: "camera_body", count: 1 },
                 { key: "lens", count: 0 },

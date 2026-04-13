@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { deleteDevice, fetchDevice } from "../../api/devices";
 import { CATEGORY_LABELS, STATUS_LABELS, type DeviceDetail } from "../../types/device";
 import { formatCurrency, formatDate, formatDateTime } from "../../utils/format";
-import { formatDeviceTitle, isFeelingScore, ratingLabelText } from "../../utils/device";
+import {
+  formatDeviceTitle,
+  isFeelingScore,
+  ratingGlyphText,
+  ratingLabelText
+} from "../../utils/device";
 
 interface DeviceDetailDrawerProps {
   deviceId: string;
@@ -66,6 +71,13 @@ export function DeviceDetailDrawer({
       : device.score_rank != null
         ? `#${device.score_rank}`
         : "未上榜";
+
+  const scoreGlyph = useMemo(() => {
+    if (!device) {
+      return "";
+    }
+    return ratingGlyphText(device.rating_label, device.score);
+  }, [device]);
 
   return (
     <>
@@ -143,27 +155,20 @@ export function DeviceDetailDrawer({
                   <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">
                     主观评价系统
                   </div>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-[1fr,1fr]">
-                    <div className="rounded-2xl bg-panelAlt p-4">
-                      <div className="text-xs uppercase tracking-[0.16em] text-textSecondary">
-                        数字评分
-                      </div>
-                      <div className="mt-2 text-3xl font-semibold text-textPrimary">
-                        {feeling ? "感受中" : device.score}
-                      </div>
-                      <div className="mt-1 text-sm text-textSecondary">
-                        {ratingLabelText(device.rating_label)}
+
+                  <div className="score-hero-card mt-4">
+                    <div className="score-hero-copy">
+                      <div className="score-hero-label">数字评分</div>
+                      <div className="score-hero-value">{feeling ? "感受中" : device.score}</div>
+                      <div className="score-hero-meta">
+                        {feeling ? "当前处于体验阶段" : ratingLabelText(device.rating_label)}
                       </div>
                     </div>
-                    <div className="rounded-2xl bg-panelAlt p-4">
-                      <div className="text-xs uppercase tracking-[0.16em] text-textSecondary">
-                        评分状态
-                      </div>
-                      <div className="mt-2 text-lg font-semibold text-textPrimary">
-                        {feeling ? "正在感受" : "已形成判断"}
-                      </div>
+                    <div className={`score-hero-glyph ${feeling ? "is-feeling" : ""}`} aria-hidden="true">
+                      {scoreGlyph}
                     </div>
                   </div>
+
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div className="rounded-2xl bg-success/8 p-4">
                       <div className="text-sm font-medium text-success">优点</div>
@@ -178,6 +183,7 @@ export function DeviceDetailDrawer({
                       </ul>
                     </div>
                   </div>
+
                   <div className="mt-4">
                     <div className="text-sm font-medium text-textPrimary">详细评价</div>
                     <p className="mt-3 whitespace-pre-line text-sm leading-7 text-textSecondary">

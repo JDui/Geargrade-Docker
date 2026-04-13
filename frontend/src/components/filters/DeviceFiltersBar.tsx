@@ -38,6 +38,8 @@ export function DeviceFiltersBar({
   onFiltersChange,
   onViewModeChange
 }: DeviceFiltersBarProps) {
+  const tableMode = viewMode === "table";
+
   return (
     <section className="panel sticky top-[132px] z-30 p-4 xl:top-[92px]">
       <div className="space-y-3">
@@ -146,61 +148,81 @@ export function DeviceFiltersBar({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-panelAlt/50 px-3 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="px-1 text-xs uppercase tracking-[0.18em] text-textSecondary">
-              排序
-            </span>
-            <select
-              className="field min-w-[144px]"
-              value={filters.sortBy}
-              onChange={(event) =>
-                onFiltersChange({
-                  ...filters,
-                  sortBy: event.target.value as DeviceFilters["sortBy"]
-                })
-              }
-            >
-              {sortOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+        <div className="overflow-x-auto">
+          <div className="flex min-w-max items-center justify-between gap-4 rounded-2xl border border-line bg-panelAlt/50 px-3 py-3">
+            <div className="flex items-center gap-2">
+              <span className="px-1 text-xs uppercase tracking-[0.18em] text-textSecondary">
+                排序
+              </span>
+              <select
+                className="field min-w-[156px] py-2"
+                value={filters.sortBy}
+                onChange={(event) =>
+                  onFiltersChange({
+                    ...filters,
+                    sortBy: event.target.value as DeviceFilters["sortBy"]
+                  })
+                }
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
 
-            <select
-              className="field min-w-[96px]"
-              value={filters.sortOrder}
-              onChange={(event) =>
-                onFiltersChange({
-                  ...filters,
-                  sortOrder: event.target.value as DeviceFilters["sortOrder"]
-                })
-              }
-            >
-              <option value="desc">降序</option>
-              <option value="asc">升序</option>
-            </select>
-          </div>
+              <div
+                className={[
+                  "transition-all duration-300 ease-out",
+                  tableMode
+                    ? "pointer-events-none w-0 -translate-x-4 overflow-hidden opacity-0"
+                    : "w-[8.5rem] translate-x-0 opacity-100"
+                ].join(" ")}
+                aria-hidden={tableMode}
+              >
+                <div className="sort-toggle">
+                  <span
+                    className={`sort-toggle-thumb ${filters.sortOrder === "asc" ? "translate-x-0" : "translate-x-full"}`}
+                  />
+                  <button
+                    className={`sort-toggle-option ${filters.sortOrder === "asc" ? "is-active" : ""}`}
+                    type="button"
+                    onClick={() => onFiltersChange({ ...filters, sortOrder: "asc" })}
+                    tabIndex={tableMode ? -1 : 0}
+                  >
+                    升序
+                  </button>
+                  <button
+                    className={`sort-toggle-option ${filters.sortOrder === "desc" ? "is-active" : ""}`}
+                    type="button"
+                    onClick={() => onFiltersChange({ ...filters, sortOrder: "desc" })}
+                    tabIndex={tableMode ? -1 : 0}
+                  >
+                    降序
+                  </button>
+                </div>
+              </div>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <span className="px-1 text-xs uppercase tracking-[0.18em] text-textSecondary">
-              视图
-            </span>
-            <button
-              className={viewMode === "cards" ? "button-primary" : "button-secondary"}
-              type="button"
-              onClick={() => onViewModeChange("cards")}
-            >
-              卡片
-            </button>
-            <button
-              className={viewMode === "table" ? "button-primary" : "button-secondary"}
-              type="button"
-              onClick={() => onViewModeChange("table")}
-            >
-              表格
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="px-1 text-xs uppercase tracking-[0.18em] text-textSecondary">
+                视图
+              </span>
+              <button
+                className={viewMode === "cards" ? "button-primary px-3" : "button-secondary px-3"}
+                type="button"
+                onClick={() => onViewModeChange("cards")}
+              >
+                卡片
+              </button>
+              <button
+                className={viewMode === "table" ? "button-primary px-3" : "button-secondary px-3"}
+                type="button"
+                onClick={() => onViewModeChange("table")}
+              >
+                表格
+              </button>
+            </div>
           </div>
         </div>
       </div>

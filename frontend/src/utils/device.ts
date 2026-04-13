@@ -7,6 +7,7 @@ export function formatAcquisitionSuperscript(iteration: number): string {
   if (iteration <= 1) {
     return "";
   }
+
   return String(iteration)
     .split("")
     .map((digit) => superscriptDigits[Number(digit)] ?? digit)
@@ -22,6 +23,19 @@ export function ratingLabelText(rating: RatingLabel | null): string {
     return "正在感受";
   }
   return RATING_LABELS[rating];
+}
+
+export function ratingGlyphText(rating: RatingLabel | null, score: number): string {
+  if (isFeelingScore(score)) {
+    return "感";
+  }
+
+  return {
+    god: "神",
+    excellent: "佳",
+    average: "中",
+    low: "低"
+  }[rating ?? "average"];
 }
 
 export function isFeelingScore(score: number): boolean {

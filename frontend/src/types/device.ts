@@ -38,6 +38,7 @@ export type SortOrder = "asc" | "desc";
 export type ViewMode = "cards" | "table";
 export type ThemeMode = "dark" | "light";
 export type LeaderboardTab = "holding-duration" | "score" | "finance";
+export type AnnualBreakdownMode = "category" | "rating";
 
 export interface DeviceListItem {
   id: number;
@@ -105,13 +106,25 @@ export interface DashboardBucket<T extends string> {
   count: number;
 }
 
+export interface PurchaseYearBucket {
+  year: number;
+  count: number;
+}
+
+export interface PurchaseYearBreakdown<T extends string> {
+  year: number;
+  buckets: DashboardBucket<T>[];
+}
+
 export interface DashboardSummary {
   currently_owned_count: number;
   sold_count: number;
   feeling_in_progress_count: number;
   ratings: DashboardBucket<RatingLabel>[];
   categories: DashboardBucket<DeviceCategory>[];
-  purchase_years: Array<{ year: number; count: number }>;
+  purchase_years: PurchaseYearBucket[];
+  purchase_year_category_breakdown: PurchaseYearBreakdown<DeviceCategory>[];
+  purchase_year_rating_breakdown: PurchaseYearBreakdown<RatingLabel>[];
 }
 
 export interface MediaAsset {

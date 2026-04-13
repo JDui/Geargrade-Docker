@@ -17,16 +17,16 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
   }));
 
   return (
-    <div className="space-y-4">
-      <div className="h-[240px] min-w-0">
+    <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
+      <div className="h-[250px] min-w-0 xl:w-[280px] xl:shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart margin={{ top: 6, right: 6, bottom: 6, left: 6 }}>
             <Pie
               data={chartData}
               dataKey="count"
               nameKey="label"
-              innerRadius={52}
-              outerRadius={82}
+              innerRadius={56}
+              outerRadius={86}
               paddingAngle={3}
             >
               {chartData.map((entry, index) => (
@@ -47,7 +47,7 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
                 const percent = payload?.percent ?? 0;
                 return [`${value} 台`, `${label} · ${percent}%`];
               }}
-              labelFormatter={() => "设备类别"}
+              labelFormatter={() => "设备类别分布"}
               labelStyle={{ color: "rgb(var(--color-text-primary))" }}
               itemStyle={{ color: "rgb(var(--color-text-primary))" }}
             />
@@ -55,11 +55,11 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
         </ResponsiveContainer>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid min-w-0 flex-1 gap-2">
         {chartData.map((item, index) => (
           <div
             key={item.key}
-            className="flex items-center justify-between gap-3 rounded-xl bg-panelAlt/80 px-3 py-2"
+            className="flex items-center justify-between gap-3 rounded-xl bg-panelAlt/80 px-3 py-2.5"
           >
             <span className="flex min-w-0 items-center gap-2 text-sm text-textPrimary">
               <span

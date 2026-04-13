@@ -1,5 +1,5 @@
 from app.core.config import Settings
-from app.core.enums import DeviceCategory, DeviceStatus
+from app.core.enums import DeviceCategory, DeviceStatus, RatingLabel
 from app.schemas.device import DeviceCreate
 from app.services.device_service import create_device
 from app.services.stats_service import get_dashboard_summary
@@ -118,4 +118,18 @@ def test_dashboard_purchase_years_excludes_accessories(session):
     assert [(bucket.year, bucket.count) for bucket in summary.purchase_years] == [
         (2023, 1),
         (2024, 1),
+    ]
+    assert summary.purchase_year_category_breakdown[0].year == 2023
+    assert [(bucket.key, bucket.count) for bucket in summary.purchase_year_category_breakdown[0].buckets] == [
+        (DeviceCategory.CAMERA_BODY, 1),
+        (DeviceCategory.LENS, 0),
+        (DeviceCategory.ACTION_CAMERA, 0),
+        (DeviceCategory.DRONE, 0),
+        (DeviceCategory.OTHER, 0),
+    ]
+    assert [(bucket.key, bucket.count) for bucket in summary.purchase_year_rating_breakdown[0].buckets] == [
+        (RatingLabel.GOD, 0),
+        (RatingLabel.EXCELLENT, 1),
+        (RatingLabel.AVERAGE, 0),
+        (RatingLabel.LOW, 0),
     ]

@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { useMatch } from "react-router-dom";
+import { useMatch, useNavigate } from "react-router-dom";
 
 import { fetchDevices } from "../api/devices";
 import { AnnualPurchaseChart } from "../components/dashboard/AnnualPurchaseChart";
@@ -12,10 +12,16 @@ import { DeviceFiltersBar } from "../components/filters/DeviceFiltersBar";
 import { useDashboardSummary } from "../components/layout/DashboardSummaryProvider";
 import {
   DEFAULT_FILTERS,
+  STATUS_LABELS,
+  type AnnualBreakdownMode,
   type DeviceFilters,
   type DeviceListItem,
   type ViewMode
 } from "../types/device";
+import { formatDate } from "../utils/format";
+import { formatDeviceTitle, isFeelingScore, ratingLabelText } from "../utils/device";
+
+const HOLDING_STATUSES = new Set(["holding", "for_sale"]);
 
 export default function DashboardPage() {
   const tableSortFields = new Set([
@@ -27,19 +33,22 @@ export default function DashboardPage() {
     "purchase_date",
     "sale_date"
   ]);
+  const navigate = useNavigate();
   const drawerMatch = useMatch("/devices/:deviceId");
   const { summary, refreshSummary } = useDashboardSummary();
   const [devices, setDevices] = useState<DeviceListItem[]>([]);
+  const [currentHoldingDevices, setCurrentHoldingDevices] = useState<DeviceListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState<DeviceFilters>(DEFAULT_FILTERS);
+  const [viewMode, setViewMode] = useState<ViewMode>("cards");
+  const [annualMode, setAnnualMode] = useState<AnnualBreakdownMode>("category");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const deferredSearch = useDeferredValue(filters.search);
   const effectiveFilters = useMemo(
     () => ({ ...filters, search: deferredSearch }),
     [filters, deferredSearch]
   );
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const availablePurchaseYears = useMemo(() => {
     const years = (summary?.purchase_years ?? []).map((item) => item.year);
@@ -90,13 +99,28 @@ export default function DashboardPage() {
     }
   }
 
+  async function loadCurrentHoldingDevices() {
+    try {
+      const result = await fetchDevices(DEFAULT_FILTERS);
+      setCurrentHoldingDevices(
+        result.items.filter((device) => HOLDING_STATUSES.has(device.status)).slice(0, 4)
+      );
+    } catch {
+      setCurrentHoldingDevices([]);
+    }
+  }
+
   useEffect(() => {
     loadDevices(effectiveFilters).catch(() => undefined);
   }, [effectiveFilters]);
 
+  useEffect(() => {
+    loadCurrentHoldingDevices().catch(() => undefined);
+  }, []);
+
   return (
     <div className="space-y-6">
-      <section className="grid gap-4 xl:grid-cols-[1.08fr,1fr]">
+      <section className="grid gap-4 xl:grid-cols-[0.92fr,1.08fr]">
         <div className="grid gap-4">
           <section className="panel p-5">
             <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
@@ -113,11 +137,11 @@ export default function DashboardPage() {
 
           <section className="panel p-5">
             <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
-              年度购买量
+              设备类别分布
             </div>
             <div className="mt-4">
               {summary ? (
-                <AnnualPurchaseChart data={summary.purchase_years} />
+                <CategoryDonutChart data={summary.categories} />
               ) : (
                 <div className="text-textSecondary">加载中...</div>
               )}
@@ -125,18 +149,86 @@ export default function DashboardPage() {
           </section>
         </div>
 
-        <section className="panel p-5">
-          <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
-            设备类别分布
-          </div>
-          <div className="mt-4">
-            {summary ? (
-              <CategoryDonutChart data={summary.categories} />
-            ) : (
-              <div className="text-textSecondary">加载中...</div>
-            )}
-          </div>
-        </section>
+        <div className="grid gap-4">
+          <section className="panel p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
+              年度购买量
+            </div>
+            <div className="mt-4">
+              {summary ? (
+                <AnnualPurchaseChart
+                  totals={summary.purchase_years}
+                  categoryBreakdown={summary.purchase_year_category_breakdown}
+                  ratingBreakdown={summary.purchase_year_rating_breakdown}
+                  mode={annualMode}
+                  onModeChange={setAnnualMode}
+                />
+              ) : (
+                <div className="text-textSecondary">加载中...</div>
+              )}
+            </div>
+          </section>
+
+          <section className="panel p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
+                当前持有设备
+              </div>
+              <div className="text-xs text-textSecondary">
+                {summary?.currently_owned_count ?? currentHoldingDevices.length} 台
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {currentHoldingDevices.length ? (
+                currentHoldingDevices.map((device) => (
+                  <button
+                    key={device.id}
+                    type="button"
+                    className="rounded-2xl border border-line bg-panelAlt/70 p-4 text-left transition hover:border-accent/30 hover:bg-panelAlt"
+                    onClick={() => navigate(`/devices/${device.id}`)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-textPrimary">
+                          {formatDeviceTitle(device)}
+                        </div>
+                        <div className="mt-1 text-xs text-textSecondary">{device.brand}</div>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-success/12 px-2.5 py-1 text-xs font-medium text-success">
+                        {STATUS_LABELS[device.status]}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 flex items-end justify-between gap-3">
+                      <div>
+                        <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">
+                          购入日期
+                        </div>
+                        <div className="mt-1 text-sm text-textPrimary">
+                          {formatDate(device.purchase_date)}
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">
+                          评分
+                        </div>
+                        <div className="mt-1 text-sm font-medium text-textPrimary">
+                          {isFeelingScore(device.score) ? "感受中" : `${device.score} · ${ratingLabelText(device.rating_label)}`}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-full rounded-2xl border border-dashed border-line bg-panelAlt/60 px-4 py-8 text-center text-sm text-textSecondary">
+                  暂无当前持有设备
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </section>
 
       <DeviceFiltersBar
@@ -194,6 +286,7 @@ export default function DashboardPage() {
           closeTo="/"
           onChanged={() => {
             loadDevices(effectiveFilters).catch(() => undefined);
+            loadCurrentHoldingDevices().catch(() => undefined);
             refreshSummary().catch(() => undefined);
           }}
         />
