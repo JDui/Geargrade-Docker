@@ -67,6 +67,53 @@ Geargrade 是一个面向个人摄影器材管理的自托管 Web 应用。它�
 
 ![新增设备](docs/screenshots/device-form.png)
 
+## Docker Compose 模板
+
+以下模板适合直接放到独立部署目录中使用，例如：
+
+```text
+deploy/
+├─ docker-compose.yml
+└─ .env
+```
+
+先从 Release 下载对应架构的 tar 包并导入本地 Docker：
+
+```bash
+docker load -i geargrade-v0.1-linux-amd64.tar
+```
+
+ARM 设备改为：
+
+```bash
+docker load -i geargrade-v0.1-linux-arm64.tar
+```
+
+```yaml
+services:
+  geargrade:
+    image: geargrade:v0.1-amd64
+    container_name: geargrade-app
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    environment:
+      DATABASE_URL: sqlite:///./data/geargrade.db
+      MEDIA_ROOT: ./data/media
+      MEDIA_URL_PREFIX: /media
+      SEED_SAMPLE_DATA: "true"
+      APP_ENV: production
+    volumes:
+      - geargrade_data:/app/data
+      - geargrade_media:/app/data/media
+
+volumes:
+  geargrade_data:
+  geargrade_media:
+```
+
+如果你运行在 ARM 设备上，例如 Apple Silicon 或树莓派，请将镜像标签改为 `geargrade:v0.1-arm64`。
+
 ## 项目目录
 
 ```text
