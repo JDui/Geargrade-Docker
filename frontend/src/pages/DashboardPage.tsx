@@ -119,26 +119,18 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       <section className="grid gap-4 xl:grid-cols-[0.92fr,1.08fr]">
         <div className="grid gap-4">
-          <section className="panel p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
-              评价等级分布
-            </div>
+          <section className="panel p-4 sm:p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">评价等级分布</div>
             <div className="mt-4">
-              {summary ? (
-                <RatingBarChart data={summary.ratings} />
-              ) : (
-                <div className="text-textSecondary">加载中...</div>
-              )}
+              {summary ? <RatingBarChart data={summary.ratings} /> : <div className="text-textSecondary">加载中...</div>}
             </div>
           </section>
 
-          <section className="panel p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
-              设备类别分布
-            </div>
+          <section className="panel p-4 sm:p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">设备类别分布</div>
             <div className="mt-4">
               {summary ? (
                 <CategoryDonutChart data={summary.categories} />
@@ -150,10 +142,8 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-4">
-          <section className="panel p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
-              年度购买量
-            </div>
+          <section className="panel p-4 sm:p-5">
+            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">年度购买量</div>
             <div className="mt-4">
               {summary ? (
                 <AnnualPurchaseChart
@@ -169,23 +159,21 @@ export default function DashboardPage() {
             </div>
           </section>
 
-          <section className="panel p-5">
+          <section className="panel p-4 sm:p-5">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">
-                当前持有设备
-              </div>
+              <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">当前持有设备</div>
               <div className="text-xs text-textSecondary">
                 {summary?.currently_owned_count ?? currentHoldingDevices.length} 台
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3">
               {currentHoldingDevices.length ? (
                 currentHoldingDevices.map((device) => (
                   <button
                     key={device.id}
                     type="button"
-                    className="rounded-2xl border border-line bg-panelAlt/70 p-4 text-left transition hover:border-accent/30 hover:bg-panelAlt"
+                    className="rounded-2xl border border-line bg-panelAlt/70 p-3.5 text-left transition hover:border-accent/30 hover:bg-panelAlt sm:p-4"
                     onClick={() => navigate(`/devices/${device.id}`)}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -215,7 +203,9 @@ export default function DashboardPage() {
                           评分
                         </div>
                         <div className="mt-1 text-sm font-medium text-textPrimary">
-                          {isFeelingScore(device.score) ? "感受中" : `${device.score} · ${ratingLabelText(device.rating_label)}`}
+                          {isFeelingScore(device.score)
+                            ? "感受中"
+                            : `${device.score} / ${ratingLabelText(device.rating_label)}`}
                         </div>
                       </div>
                     </div>

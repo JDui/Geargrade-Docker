@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, type ClipboardEvent } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import type {
@@ -81,6 +81,8 @@ export function DeviceForm({
   const { register, handleSubmit, control, formState, reset, watch } = useForm<DeviceFormValues>({
     defaultValues: defaultValues(defaultDevice)
   });
+  const [selectedUploadName, setSelectedUploadName] = useState<string>("");
+  const [pasteHint, setPasteHint] = useState<string>("");
 
   useEffect(() => {
     reset(defaultValues(defaultDevice));
@@ -92,6 +94,31 @@ export function DeviceForm({
   const mountSystemKey = watch("mount_system_key");
   const saleFieldsDisabled = status === "holding" || status === "for_sale";
   const isBroken = status === "broken";
+
+  function updateUploadFile(file: File | null, hint = "") {
+    onUploadChange(file);
+    setSelectedUploadName(file?.name ?? "");
+    setPasteHint(hint);
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLDivElement>) {
+    const clipboardItems = Array.from(event.clipboardData.items ?? []);
+    const imageItem = clipboardItems.find((item) => item.type.startsWith("image/"));
+    if (!imageItem) {
+      setPasteHint("剪贴板里没有可用图片。");
+      return;
+    }
+
+    const blob = imageItem.getAsFile();
+    if (!blob) {
+      setPasteHint("读取剪贴板图片失败，请改用文件选择。");
+      return;
+    }
+
+    const extension = blob.type.split("/")[1] || "png";
+    const file = new File([blob], `pasted-image.${extension}`, { type: blob.type });
+    updateUploadFile(file, "已从剪贴板载入图片。");
+  }
 
   const submitHandler = handleSubmit(async (values) => {
     const acquisitionIteration = values.is_first_purchase
@@ -195,9 +222,7 @@ export function DeviceForm({
               step={1}
               {...register("score", { required: true })}
             />
-            <p className="mt-2 text-sm text-textSecondary">
-              `-1` 表示正在感受，不参与评分统计。
-            </p>
+            <p className="mt-2 text-sm text-textSecondary">`-1` 表示正在感受，不参与评分统计。</p>
             <p className="mt-1 text-sm text-textSecondary">
               当前映射：
               <span className="ml-1 font-medium text-textPrimary">
@@ -273,7 +298,9 @@ export function DeviceForm({
 
           {saleFieldsDisabled ? (
             <div className="rounded-2xl border border-line bg-panelAlt px-4 py-3 text-sm text-textSecondary">
-              {status === "holding" ? "持有中的设备不设置售出价格和售出日期。" : "待售设备不设置售出价格和售出日期。"}
+              {status === "holding"
+                ? "持有中的设备不设置售出价格和售出日期。"
+                : "待售设备不设置售出价格和售出日期。"}
             </div>
           ) : isBroken ? (
             <div className="rounded-2xl border border-line bg-panelAlt px-4 py-3 text-sm text-textSecondary">
@@ -327,14 +354,34 @@ export function DeviceForm({
         </div>
 
         {imageMode === "upload" ? (
-          <div className="mt-4">
-            <label className="field-label">上传文件</label>
-            <input
-              className="field"
-              type="file"
-              accept="image/*"
-              onChange={(event) => onUploadChange(event.target.files?.[0] ?? null)}
-            />
+          <div className="mt-4 space-y-3">
+            <div
+              className="rounded-2xl border border-dashed border-line bg-panelAlt/60 p-4 text-sm text-textSecondary outline-none transition focus:border-accent"
+              role="button"
+              tabIndex={0}
+              onPaste={handlePaste}
+            >
+              <div className="font-medium text-textPrimary">可直接粘贴图片</div>
+              <div className="mt-1">把焦点放在这里后按 Ctrl/Cmd + V，也可以继续使用文件选择。</div>
+              {selectedUploadName ? (
+                <div className="mt-3 rounded-xl bg-panel px-3 py-2 text-textPrimary">
+                  当前文件：{selectedUploadName}
+                </div>
+              ) : null}
+              {pasteHint ? <div className="mt-2 text-xs text-textSecondary">{pasteHint}</div> : null}
+            </div>
+
+            <div>
+              <label className="field-label">上传文件</label>
+              <input
+                className="field"
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  updateUploadFile(event.target.files?.[0] ?? null);
+                }}
+              />
+            </div>
           </div>
         ) : null}
 

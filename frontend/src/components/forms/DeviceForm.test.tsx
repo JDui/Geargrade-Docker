@@ -25,6 +25,39 @@ describe("DeviceForm", () => {
     fireEvent.change(screen.getByLabelText("状态"), { target: { value: "for_sale" } });
     fireEvent.click(screen.getByRole("button", { name: "创建设备" }));
 
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ score: -1, sale_price: null, sale_date: null }));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ score: -1, sale_price: null, sale_date: null })
+    );
+  });
+
+  it("accepts pasted image files in upload mode", () => {
+    const onUploadChange = vi.fn();
+
+    render(
+      <DeviceForm
+        imageMode="upload"
+        remoteUrl=""
+        onImageModeChange={() => undefined}
+        onRemoteUrlChange={() => undefined}
+        onUploadChange={onUploadChange}
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        submitting={false}
+      />
+    );
+
+    const pasteTarget = screen.getByRole("button", { name: /可直接粘贴图片/i });
+    const file = new File(["image"], "clipboard.png", { type: "image/png" });
+    const clipboardData = {
+      items: [
+        {
+          type: "image/png",
+          getAsFile: () => file
+        }
+      ]
+    };
+
+    fireEvent.paste(pasteTarget, { clipboardData });
+
+    expect(onUploadChange).toHaveBeenCalledWith(expect.any(File));
   });
 });

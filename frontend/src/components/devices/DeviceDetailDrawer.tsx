@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { deleteDevice, fetchDevice } from "../../api/devices";
 import { CATEGORY_LABELS, STATUS_LABELS, type DeviceDetail } from "../../types/device";
-import { formatCurrency, formatDate, formatDateTime } from "../../utils/format";
+import { formatCurrency, formatDate } from "../../utils/format";
 import {
   formatDeviceTitle,
   isFeelingScore,
@@ -15,6 +15,23 @@ interface DeviceDetailDrawerProps {
   deviceId: string;
   closeTo?: string;
   onChanged: () => void;
+}
+
+function saleDateText(device: DeviceDetail) {
+  if (device.sale_date) {
+    return formatDate(device.sale_date);
+  }
+
+  switch (device.status) {
+    case "holding":
+      return "持有中";
+    case "for_sale":
+      return "待售";
+    case "broken":
+      return "已损坏";
+    default:
+      return "--";
+  }
 }
 
 export function DeviceDetailDrawer({
@@ -89,10 +106,10 @@ export function DeviceDetailDrawer({
       />
       <aside className="fixed right-0 top-0 z-50 h-full w-full max-w-xl border-l border-line bg-surface/95 shadow-panel">
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-line px-6 py-5">
-            <div>
+          <div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-6 sm:py-5">
+            <div className="min-w-0">
               <div className="text-xs uppercase tracking-[0.22em] text-accent/80">设备详情</div>
-              <h2 className="mt-1 text-2xl font-semibold text-textPrimary">
+              <h2 className="mt-1 truncate text-xl font-semibold text-textPrimary sm:text-2xl">
                 {device ? formatDeviceTitle(device) : "加载中..."}
               </h2>
             </div>
@@ -101,7 +118,7 @@ export function DeviceDetailDrawer({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
             {loading ? <div className="text-textSecondary">正在加载设备详情...</div> : null}
             {error ? (
               <div className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-danger">
@@ -110,16 +127,16 @@ export function DeviceDetailDrawer({
             ) : null}
 
             {!loading && !error && device ? (
-              <div className="space-y-6">
+              <div className="space-y-5 sm:space-y-6">
                 <section className="panel p-4">
                   {device.image_url ? (
                     <img
                       src={device.image_url}
                       alt={device.name}
-                      className="mb-4 h-52 w-full rounded-2xl border border-line object-cover"
+                      className="mb-4 h-44 w-full rounded-2xl border border-line object-cover sm:h-52"
                     />
                   ) : (
-                    <div className="mb-4 flex h-52 items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt text-textSecondary">
+                    <div className="mb-4 flex h-44 items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt text-textSecondary sm:h-52">
                       暂无设备图片
                     </div>
                   )}
@@ -211,15 +228,7 @@ export function DeviceDetailDrawer({
                     </div>
                     <div className="rounded-2xl bg-panelAlt p-4">
                       <div className="text-textSecondary">售出日期</div>
-                      <div className="mt-1 text-textPrimary">{formatDate(device.sale_date)}</div>
-                    </div>
-                    <div className="rounded-2xl bg-panelAlt p-4">
-                      <div className="text-textSecondary">创建时间</div>
-                      <div className="mt-1 text-textPrimary">{formatDateTime(device.created_at)}</div>
-                    </div>
-                    <div className="rounded-2xl bg-panelAlt p-4">
-                      <div className="text-textSecondary">更新时间</div>
-                      <div className="mt-1 text-textPrimary">{formatDateTime(device.updated_at)}</div>
+                      <div className="mt-1 text-textPrimary">{saleDateText(device)}</div>
                     </div>
                   </div>
 

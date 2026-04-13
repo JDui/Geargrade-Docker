@@ -5,7 +5,7 @@ import { useTheme } from "./ThemeProvider";
 
 function navClassName({ isActive }: { isActive: boolean }) {
   return [
-    "rounded-xl px-3 py-2 text-sm transition",
+    "shrink-0 rounded-xl px-3 py-2 text-sm transition",
     isActive ? "bg-accent/12 text-accent" : "text-textSecondary hover:bg-panelAlt hover:text-textPrimary"
   ].join(" ");
 }
@@ -20,9 +20,9 @@ function SummaryBadge({
   accentClass: string;
 }) {
   return (
-    <div className={`rounded-2xl border border-line/80 px-3 py-2 ${accentClass}`}>
+    <div className={`rounded-xl border border-line/80 px-2.5 py-2 sm:rounded-2xl sm:px-3 ${accentClass}`}>
       <div className="text-[11px] uppercase tracking-[0.18em] text-textSecondary">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-textPrimary">{value}</div>
+      <div className="mt-1 text-base font-semibold text-textPrimary sm:text-lg">{value}</div>
     </div>
   );
 }
@@ -34,8 +34,8 @@ export function AppShell() {
   return (
     <div className="min-h-screen bg-grid bg-[size:18px_18px]">
       <header className="sticky top-0 z-40 border-b border-line/80 bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex min-w-0 items-center gap-4">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:px-8 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <div className="shrink-0">
               <div className="text-xs uppercase tracking-[0.28em] text-accent/80">Geargrade</div>
               <div className="text-lg font-semibold text-textPrimary">摄影器材档案库</div>
@@ -60,8 +60,8 @@ export function AppShell() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <nav className="flex items-center gap-2 rounded-2xl border border-line bg-panelAlt/70 p-1">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <nav className="flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panelAlt/70 p-1 sm:gap-2">
               <NavLink to="/" end className={navClassName}>
                 首页
               </NavLink>
@@ -82,7 +82,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
         <Outlet />
       </main>
     </div>
