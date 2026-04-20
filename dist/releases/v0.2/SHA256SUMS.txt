@@ -1,0 +1,2 @@
+d7c165087ecf68a000e7cf17ec6efdd2a6c008b1af95f9dae98f17bed36cce1a *geargrade-v0.2-linux-amd64.tar
+b2e012bf7da386e30e9c7d22bc988cf2958641798806689dda6b6ee1e03041c5 *geargrade-v0.2-linux-arm64.tar
