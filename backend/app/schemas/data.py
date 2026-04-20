@@ -22,3 +22,9 @@ class DataImportResponse(BaseModel):
     created: int
     skipped: int
     errors: list[DataImportError]
+
+
+class DataResetResponse(BaseModel):
+    devices_deleted: int
+    wishlist_deleted: int
+    media_files_deleted: int

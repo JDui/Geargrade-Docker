@@ -1,21 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
 
-import { CATEGORY_LABELS, STATUS_LABELS, type DeviceListItem } from "../../types/device";
-import { formatCurrency, formatDailyCost, formatDate } from "../../utils/format";
+import { CATEGORY_LABELS, type WishlistDeviceListItem } from "../../types/device";
+import { formatDateTime } from "../../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../../utils/device";
 
-function statusClass(status: DeviceListItem["status"]) {
-  const palette: Record<DeviceListItem["status"], string> = {
-    holding: "bg-success/15 text-success",
-    for_sale: "bg-warning/15 text-warning",
-    sold: "bg-panelAlt text-textPrimary",
-    broken: "bg-danger/15 text-danger"
-  };
-  return palette[status];
-}
-
-function ratingClass(rating: NonNullable<DeviceListItem["rating_label"]>) {
-  const palette: Record<NonNullable<DeviceListItem["rating_label"]>, string> = {
+function ratingClass(rating: NonNullable<WishlistDeviceListItem["rating_label"]>) {
+  const palette: Record<NonNullable<WishlistDeviceListItem["rating_label"]>, string> = {
     god: "bg-warning/20 text-warning",
     excellent: "bg-success/15 text-success",
     average: "bg-accent/15 text-accent",
@@ -24,7 +14,7 @@ function ratingClass(rating: NonNullable<DeviceListItem["rating_label"]>) {
   return palette[rating];
 }
 
-function ImageFallback({ device }: { device: DeviceListItem }) {
+function ImageFallback({ device }: { device: WishlistDeviceListItem }) {
   return (
     <div className="flex h-24 w-28 shrink-0 items-center justify-center rounded-xl border border-line bg-panelAlt">
       <div className="text-center">
@@ -35,17 +25,11 @@ function ImageFallback({ device }: { device: DeviceListItem }) {
   );
 }
 
-interface DeviceCardProps {
-  device: DeviceListItem;
-  detailBasePath?: string;
-  editBasePath?: string;
+interface WishlistCardProps {
+  device: WishlistDeviceListItem;
 }
 
-export function DeviceCard({
-  device,
-  detailBasePath = "/devices",
-  editBasePath = "/devices"
-}: DeviceCardProps) {
+export function WishlistCard({ device }: WishlistCardProps) {
   const navigate = useNavigate();
   const feeling = isFeelingScore(device.score);
   const unrated = isUnratedScore(device.score);
@@ -55,7 +39,7 @@ export function DeviceCard({
       <button
         type="button"
         className="flex flex-1 flex-col p-4 text-left transition hover:bg-panelAlt/20 active:scale-[0.995]"
-        onClick={() => navigate(`${detailBasePath}/${device.id}`)}
+        onClick={() => navigate(`/wishlist/devices/${device.id}`)}
       >
         <div className="flex gap-4">
           {device.image_url ? (
@@ -77,21 +61,16 @@ export function DeviceCard({
                   </span>
                 ) : null}
                 {feeling ? (
-                  <span className="rounded-full bg-accent/12 px-2.5 py-1 text-xs font-medium text-accent">
-                    正在感受
-                  </span>
+                  <span className="rounded-full bg-accent/12 px-2.5 py-1 text-xs font-medium text-accent">正在感受</span>
                 ) : null}
                 {unrated ? (
-                  <span className="rounded-full bg-panelAlt px-2.5 py-1 text-xs font-medium text-textSecondary">
-                    暂不做评价
-                  </span>
+                  <span className="rounded-full bg-panelAlt px-2.5 py-1 text-xs font-medium text-textSecondary">暂不做评价</span>
                 ) : null}
               </div>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               <span className="rounded-full bg-panelAlt px-2.5 py-1 text-textPrimary">{CATEGORY_LABELS[device.category]}</span>
-              <span className={`rounded-full px-2.5 py-1 ${statusClass(device.status)}`}>{STATUS_LABELS[device.status]}</span>
               {device.mount_system_label ? (
                 <span className="rounded-full bg-panelAlt px-2.5 py-1 text-textSecondary">{device.mount_system_label}</span>
               ) : null}
@@ -107,16 +86,12 @@ export function DeviceCard({
             </div>
           </div>
           <div className="rounded-xl bg-panelAlt px-3 py-2">
-            <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">购入价</div>
-            <div className="mt-1 text-sm font-medium text-textPrimary">{formatCurrency(device.purchase_price)}</div>
+            <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">想要购入</div>
+            <div className="mt-1 text-sm font-medium text-textPrimary">第 {device.acquisition_iteration} 次</div>
           </div>
           <div className="rounded-xl bg-panelAlt px-3 py-2">
-            <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">购入日期</div>
-            <div className="mt-1 text-sm font-medium text-textPrimary">{formatDate(device.purchase_date)}</div>
-          </div>
-          <div className="rounded-xl bg-panelAlt px-3 py-2">
-            <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">每日成本</div>
-            <div className="mt-1 text-sm font-medium text-textPrimary">{formatDailyCost(device.daily_cost_value)}</div>
+            <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">最近更新</div>
+            <div className="mt-1 text-sm font-medium text-textPrimary">{formatDateTime(device.updated_at)}</div>
           </div>
         </div>
 
@@ -134,7 +109,7 @@ export function DeviceCard({
       </button>
 
       <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-3">
-        <Link to={`${editBasePath}/${device.id}/edit`} className="button-secondary">
+        <Link to={`/wishlist/${device.id}/edit`} className="button-secondary">
           编辑
         </Link>
       </div>

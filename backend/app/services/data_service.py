@@ -1,7 +1,17 @@
+from pathlib import Path
+
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.schemas.data import DataExportResponse, DataImportError, DataImportRequest, DataImportResponse
+from app.models import Device, Tag, WishlistDevice, device_tags, wishlist_device_tags
+from app.schemas.data import (
+    DataExportResponse,
+    DataImportError,
+    DataImportRequest,
+    DataImportResponse,
+    DataResetResponse,
+)
 from app.services import device_service
 
 
@@ -32,3 +42,37 @@ def import_data(session: Session, payload: DataImportRequest, settings: Settings
             errors.append(DataImportError(index=index, name=item.name, reason=str(exc)))
 
     return DataImportResponse(total=len(payload.items), created=created, skipped=skipped, errors=errors)
+
+
+def _clear_media_files(root: Path) -> int:
+    if not root.exists():
+        return 0
+
+    deleted = 0
+    for path in root.rglob("*"):
+        if path.is_file():
+            path.unlink()
+            deleted += 1
+    return deleted
+
+
+def reset_all_data(session: Session, settings: Settings) -> DataResetResponse:
+    devices_deleted = session.query(Device).count()
+    wishlist_deleted = session.query(WishlistDevice).count()
+
+    session.execute(device_tags.delete())
+    session.execute(wishlist_device_tags.delete())
+    session.execute(delete(Device))
+    session.execute(delete(WishlistDevice))
+    session.execute(delete(Tag))
+    session.commit()
+
+    media_files_deleted = _clear_media_files(settings.media_root)
+    (settings.media_root / "uploads").mkdir(parents=True, exist_ok=True)
+    (settings.media_root / "remote-cache").mkdir(parents=True, exist_ok=True)
+
+    return DataResetResponse(
+        devices_deleted=devices_deleted,
+        wishlist_deleted=wishlist_deleted,
+        media_files_deleted=media_files_deleted,
+    )

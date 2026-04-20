@@ -16,16 +16,19 @@ export function RatingBarChart({ data }: RatingBarChartProps) {
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-full border border-line bg-panelAlt">
-        <div className="flex h-5 w-full">
-          {data.map((item) => {
-            const width =
-              total > 0 && item.count > 0 ? `${(item.count / total) * 100}%` : "0%";
+      <div className="dashboard-rating-rail">
+        <div className="flex h-6 w-full overflow-hidden rounded-full">
+          {data.map((item, index) => {
+            const width = total > 0 && item.count > 0 ? `${(item.count / total) * 100}%` : "0%";
             return (
               <div
                 key={item.key}
-                className="h-full transition-[width]"
-                style={{ width, backgroundColor: barColors[item.key] }}
+                className="dashboard-rating-segment"
+                style={{
+                  width,
+                  backgroundColor: barColors[item.key],
+                  animationDelay: `${220 + index * 90}ms`
+                }}
                 title={`${RATING_LABELS[item.key]} ${item.count}`}
               />
             );
@@ -33,24 +36,22 @@ export function RatingBarChart({ data }: RatingBarChartProps) {
         </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        {data.map((item) => {
+      <div className="grid gap-3 md:grid-cols-2">
+        {data.map((item, index) => {
           const percent = total > 0 ? `${Math.round((item.count / total) * 100)}%` : "0%";
           return (
             <div
               key={item.key}
-              className="flex items-center justify-between gap-3 rounded-xl bg-panelAlt/80 px-3 py-3"
+              className="dashboard-stat-row dashboard-stat-row-tight motion-enter"
+              style={{ animationDelay: `${260 + index * 80}ms` }}
             >
-              <span className="flex items-center gap-2 text-sm text-textPrimary">
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: barColors[item.key] }}
-                />
-                {RATING_LABELS[item.key]}
+              <span className="dashboard-stat-label">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: barColors[item.key] }} />
+                <span>{RATING_LABELS[item.key]}</span>
               </span>
-              <span className="text-sm font-semibold text-textPrimary">
-                {item.count}
-                <span className="ml-2 text-xs font-medium text-textSecondary">{percent}</span>
+              <span className="dashboard-stat-value">
+                <span>{item.count}</span>
+                <span className="dashboard-stat-percent">{percent}</span>
               </span>
             </div>
           );

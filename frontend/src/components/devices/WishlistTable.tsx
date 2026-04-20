@@ -2,44 +2,32 @@ import { useNavigate } from "react-router-dom";
 
 import {
   CATEGORY_LABELS,
-  STATUS_LABELS,
-  type DeviceListItem,
-  type SortBy,
-  type SortOrder
+  type SortOrder,
+  type WishlistDeviceListItem,
+  type WishlistSortBy
 } from "../../types/device";
-import { formatCurrency, formatDailyCost, formatDate } from "../../utils/format";
+import { formatDateTime } from "../../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../../utils/device";
 
-interface DeviceTableProps {
-  items: DeviceListItem[];
-  sortBy: SortBy;
+interface WishlistTableProps {
+  items: WishlistDeviceListItem[];
+  sortBy: WishlistSortBy;
   sortOrder: SortOrder;
-  onSortChange: (sortBy: SortBy) => void;
-  detailBasePath?: string;
-  editBasePath?: string;
+  onSortChange: (sortBy: WishlistSortBy) => void;
 }
 
-const sortableColumns: Array<{ key: SortBy; label: string }> = [
+const sortableColumns: Array<{ key: WishlistSortBy; label: string }> = [
   { key: "name", label: "设备" },
+  { key: "brand", label: "品牌" },
   { key: "category", label: "类别" },
-  { key: "status", label: "状态" },
   { key: "score", label: "评分" },
-  { key: "purchase_price", label: "购入价" },
-  { key: "purchase_date", label: "购入日期" },
-  { key: "sale_date", label: "售出日期" }
+  { key: "updated_at", label: "最近更新" }
 ];
 
-export function DeviceTable({
-  items,
-  sortBy,
-  sortOrder,
-  onSortChange,
-  detailBasePath = "/devices",
-  editBasePath = "/devices"
-}: DeviceTableProps) {
+export function WishlistTable({ items, sortBy, sortOrder, onSortChange }: WishlistTableProps) {
   const navigate = useNavigate();
 
-  function renderSortLabel(column: SortBy, label: string) {
+  function renderSortLabel(column: WishlistSortBy, label: string) {
     const active = sortBy === column;
     const suffix = !active ? "" : sortOrder === "desc" ? " ↓" : " ↑";
     return `${label}${suffix}`;
@@ -58,7 +46,7 @@ export function DeviceTable({
                   </button>
                 </th>
               ))}
-              <th className="px-4 py-3">每日成本</th>
+              <th className="px-4 py-3">想要购入</th>
               <th className="px-4 py-3 text-right">操作</th>
             </tr>
           </thead>
@@ -67,27 +55,21 @@ export function DeviceTable({
               const feeling = isFeelingScore(device.score);
               const unrated = isUnratedScore(device.score);
               return (
-                <tr
-                  key={device.id}
-                  className="cursor-pointer hover:bg-panelAlt/40"
-                  onClick={() => navigate(`${detailBasePath}/${device.id}`)}
-                >
+                <tr key={device.id} className="cursor-pointer hover:bg-panelAlt/40" onClick={() => navigate(`/wishlist/devices/${device.id}`)}>
                   <td className="px-4 py-4">
                     <div className="font-medium text-textPrimary">{formatDeviceTitle(device)}</div>
-                    <div className="text-xs text-textSecondary">{device.brand}</div>
+                    <div className="text-xs text-textSecondary">{device.mount_system_label || "未记录卡口"}</div>
                   </td>
+                  <td className="px-4 py-4">{device.brand}</td>
                   <td className="px-4 py-4">{CATEGORY_LABELS[device.category]}</td>
-                  <td className="px-4 py-4">{STATUS_LABELS[device.status]}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <span>{feeling ? "感受中" : unrated ? "暂不评价" : device.score}</span>
                       {device.rating_label ? <span className="text-xs text-textSecondary">{ratingLabelText(device.rating_label)}</span> : null}
                     </div>
                   </td>
-                  <td className="px-4 py-4">{formatCurrency(device.purchase_price)}</td>
-                  <td className="px-4 py-4">{formatDate(device.purchase_date)}</td>
-                  <td className="px-4 py-4">{formatDate(device.sale_date)}</td>
-                  <td className="px-4 py-4">{formatDailyCost(device.daily_cost_value)}</td>
+                  <td className="px-4 py-4">{formatDateTime(device.updated_at)}</td>
+                  <td className="px-4 py-4">第 {device.acquisition_iteration} 次</td>
                   <td className="px-4 py-4">
                     <div className="flex justify-end gap-2">
                       <button
@@ -95,7 +77,7 @@ export function DeviceTable({
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          navigate(`${editBasePath}/${device.id}/edit`);
+                          navigate(`/wishlist/${device.id}/edit`);
                         }}
                       >
                         编辑

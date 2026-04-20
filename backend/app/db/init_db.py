@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.base import Base
 from app.db.session import engine
-from app.models import Device, Tag  # noqa: F401
+from app.models import Device, Tag, WishlistDevice  # noqa: F401
 from app.seed.sample_data import seed_sample_devices
 
 

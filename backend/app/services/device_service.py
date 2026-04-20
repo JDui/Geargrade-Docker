@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from datetime import date
 
 from sqlalchemy import Select, and_, extract, func, or_, select
 from sqlalchemy.orm import Session, selectinload
@@ -33,6 +34,28 @@ def _build_image_url(settings: Settings, storage_path: str | None) -> str | None
     return f"{settings.media_url_prefix.rstrip('/')}/{normalized_path}"
 
 
+def calculate_daily_cost_value(
+    status: DeviceStatus,
+    purchase_price: float | None,
+    purchase_date: date | None,
+    sale_price: float | None = None,
+    sale_date: date | None = None,
+) -> float | None:
+    if purchase_price is None or purchase_date is None:
+        return None
+
+    if status == DeviceStatus.HOLDING:
+        end_date = date.today()
+        elapsed_days = max((end_date - purchase_date).days, 1)
+        return float(purchase_price) / elapsed_days
+
+    if status == DeviceStatus.SOLD and sale_price is not None and sale_date is not None:
+        elapsed_days = max((sale_date - purchase_date).days, 1)
+        return (float(purchase_price) - float(sale_price)) / elapsed_days
+
+    return None
+
+
 def serialize_device(device: Device, settings: Settings, detailed: bool = False) -> DeviceListItem | DeviceDetail:
     payload = {
         "id": device.id,
@@ -49,6 +72,13 @@ def serialize_device(device: Device, settings: Settings, detailed: bool = False)
         "tags": [tag.name for tag in device.tags],
         "purchase_price": device.purchase_price,
         "sale_price": device.sale_price,
+        "daily_cost_value": calculate_daily_cost_value(
+            device.status,
+            device.purchase_price,
+            device.purchase_date,
+            device.sale_price,
+            device.sale_date,
+        ),
         "purchase_date": device.purchase_date,
         "sale_date": device.sale_date,
         "image_source_type": device.image_source_type,
@@ -76,10 +106,10 @@ def _score_ranking_key(device: Device) -> tuple[int, float, str]:
 
 
 def get_score_rank(session: Session, device: Device) -> int | None:
-    if device.score < 0:
+    if device.score <= 0:
         return None
 
-    ranked_devices = session.scalars(select(Device).where(Device.score >= 0)).all()
+    ranked_devices = session.scalars(select(Device).where(Device.score > 0)).all()
     ranked_devices = sorted(ranked_devices, key=_score_ranking_key)
 
     for index, candidate in enumerate(ranked_devices, 1):
@@ -269,7 +299,7 @@ def _apply_rating_label_filter(statement: Select[tuple[Device]], rating_label: s
     if rating_label == RatingLabel.AVERAGE:
         return statement.where(and_(Device.score >= 50, Device.score <= 79))
     if rating_label == RatingLabel.LOW:
-        return statement.where(and_(Device.score >= 0, Device.score <= 49))
+        return statement.where(and_(Device.score >= 1, Device.score <= 49))
     return statement
 
 
@@ -304,7 +334,7 @@ def list_devices(
     if feeling_only is True:
         statement = statement.where(Device.score == -1)
     elif feeling_only is False:
-        statement = statement.where(Device.score >= 0)
+        statement = statement.where(Device.score != -1)
 
     statement = _apply_rating_label_filter(statement, rating_label)
     statement = _apply_sort(statement, sort_by, sort_order)

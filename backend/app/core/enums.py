@@ -66,8 +66,12 @@ def is_feeling_score(score: int) -> bool:
     return score == -1
 
 
+def is_unrated_score(score: int) -> bool:
+    return score == 0
+
+
 def rating_label_from_score(score: int) -> RatingLabel | None:
-    if is_feeling_score(score):
+    if is_feeling_score(score) or is_unrated_score(score):
         return None
     if score > 100:
         return RatingLabel.GOD

@@ -51,18 +51,14 @@ export function DeviceFiltersBar({
     <section className="panel z-30 p-3 sm:p-4 xl:sticky xl:top-[92px]">
       <div className="space-y-3">
         <div className="flex flex-col gap-3 sm:hidden">
-          <div className="grid gap-3 grid-cols-[minmax(0,1fr),auto,auto]">
+          <div className="grid grid-cols-[minmax(0,1fr),auto,auto] gap-3">
             <input
-              className="field min-w-0"
+              className="input min-w-0"
               placeholder="搜索名称、品牌、标签、详细评价..."
               value={filters.search}
               onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
             />
-            <button
-              className="button-secondary px-3"
-              type="button"
-              onClick={() => setMobileExpanded((current) => !current)}
-            >
+            <button className="button-secondary px-3" type="button" onClick={() => setMobileExpanded((current) => !current)}>
               {mobileExpanded ? "收起筛选" : "筛选"}
             </button>
             <button
@@ -81,7 +77,7 @@ export function DeviceFiltersBar({
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <select
-                  className="field"
+                  className="input"
                   value={filters.category}
                   onChange={(event) =>
                     onFiltersChange({
@@ -99,7 +95,7 @@ export function DeviceFiltersBar({
                 </select>
 
                 <select
-                  className="field"
+                  className="input"
                   value={filters.status}
                   onChange={(event) =>
                     onFiltersChange({
@@ -117,7 +113,7 @@ export function DeviceFiltersBar({
                 </select>
 
                 <select
-                  className="field"
+                  className="input"
                   value={filters.rating}
                   onChange={(event) =>
                     onFiltersChange({
@@ -126,7 +122,7 @@ export function DeviceFiltersBar({
                     })
                   }
                 >
-                  <option value="">所有评价</option>
+                  <option value="">所有评分</option>
                   {Object.entries(RATING_LABELS).map(([value, label]) => (
                     <option key={value} value={value}>
                       {label}
@@ -135,7 +131,7 @@ export function DeviceFiltersBar({
                 </select>
 
                 <select
-                  className="field"
+                  className="input"
                   value={filters.feelingOnly ? "true" : ""}
                   onChange={(event) =>
                     onFiltersChange({
@@ -149,7 +145,7 @@ export function DeviceFiltersBar({
                 </select>
 
                 <select
-                  className="field"
+                  className="input"
                   value={filters.purchaseYear}
                   onChange={(event) =>
                     onFiltersChange({
@@ -172,7 +168,7 @@ export function DeviceFiltersBar({
                   <div className="flex items-center gap-2">
                     <SectionTitle>排序</SectionTitle>
                     <select
-                      className="field min-w-0 flex-1 py-2"
+                      className="input min-w-0 flex-1 py-2"
                       value={filters.sortBy}
                       onChange={(event) =>
                         onFiltersChange({
@@ -200,9 +196,7 @@ export function DeviceFiltersBar({
                       aria-hidden={tableMode}
                     >
                       <div className="sort-toggle">
-                        <span
-                          className={`sort-toggle-thumb ${filters.sortOrder === "asc" ? "translate-x-0" : "translate-x-full"}`}
-                        />
+                        <span className={`sort-toggle-thumb ${filters.sortOrder === "asc" ? "translate-x-0" : "translate-x-full"}`} />
                         <button
                           className={`sort-toggle-option ${filters.sortOrder === "asc" ? "is-active" : ""}`}
                           type="button"
@@ -249,14 +243,14 @@ export function DeviceFiltersBar({
         <div className="hidden space-y-3 sm:block">
           <div className="grid gap-3 lg:grid-cols-[minmax(220px,2fr),repeat(5,minmax(0,1fr)),auto]">
             <input
-              className="field"
+              className="input"
               placeholder="搜索名称、品牌、标签、详细评价..."
               value={filters.search}
               onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
             />
 
             <select
-              className="field"
+              className="input"
               value={filters.category}
               onChange={(event) =>
                 onFiltersChange({
@@ -274,7 +268,7 @@ export function DeviceFiltersBar({
             </select>
 
             <select
-              className="field"
+              className="input"
               value={filters.status}
               onChange={(event) =>
                 onFiltersChange({
@@ -292,7 +286,7 @@ export function DeviceFiltersBar({
             </select>
 
             <select
-              className="field"
+              className="input"
               value={filters.rating}
               onChange={(event) =>
                 onFiltersChange({
@@ -301,7 +295,7 @@ export function DeviceFiltersBar({
                 })
               }
             >
-              <option value="">所有评价</option>
+              <option value="">所有评分</option>
               {Object.entries(RATING_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -310,7 +304,7 @@ export function DeviceFiltersBar({
             </select>
 
             <select
-              className="field"
+              className="input"
               value={filters.feelingOnly ? "true" : ""}
               onChange={(event) =>
                 onFiltersChange({
@@ -324,7 +318,7 @@ export function DeviceFiltersBar({
             </select>
 
             <select
-              className="field"
+              className="input"
               value={filters.purchaseYear}
               onChange={(event) =>
                 onFiltersChange({
@@ -353,7 +347,7 @@ export function DeviceFiltersBar({
               <div className="flex items-center gap-2">
                 <SectionTitle>排序</SectionTitle>
                 <select
-                  className="field min-w-[156px] py-2"
+                  className="input min-w-[156px] py-2"
                   value={filters.sortBy}
                   onChange={(event) =>
                     onFiltersChange({
@@ -379,9 +373,7 @@ export function DeviceFiltersBar({
                   aria-hidden={tableMode}
                 >
                   <div className="sort-toggle">
-                    <span
-                      className={`sort-toggle-thumb ${filters.sortOrder === "asc" ? "translate-x-0" : "translate-x-full"}`}
-                    />
+                    <span className={`sort-toggle-thumb ${filters.sortOrder === "asc" ? "translate-x-0" : "translate-x-full"}`} />
                     <button
                       className={`sort-toggle-option ${filters.sortOrder === "asc" ? "is-active" : ""}`}
                       type="button"

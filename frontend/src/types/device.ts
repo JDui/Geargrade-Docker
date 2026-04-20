@@ -35,12 +35,13 @@ export type SortBy =
   | "updated_at"
   | "created_at";
 export type SortOrder = "asc" | "desc";
+export type WishlistSortBy = "name" | "brand" | "category" | "score" | "updated_at" | "created_at";
 export type ViewMode = "cards" | "table";
 export type ThemeMode = "dark" | "light";
 export type LeaderboardTab = "holding-duration" | "score" | "finance";
 export type AnnualBreakdownMode = "category" | "rating";
 
-export interface DeviceListItem {
+export interface BaseCatalogItem {
   id: number;
   name: string;
   brand: string;
@@ -55,6 +56,7 @@ export interface DeviceListItem {
   tags: string[];
   purchase_price: number | null;
   sale_price: number | null;
+  daily_cost_value: number | null;
   purchase_date: string | null;
   sale_date: string | null;
   image_source_type: ImageSourceType | null;
@@ -65,6 +67,8 @@ export interface DeviceListItem {
   created_at: string;
   updated_at: string;
 }
+
+export interface DeviceListItem extends BaseCatalogItem {}
 
 export interface DeviceDetail extends DeviceListItem {
   score_rank: number | null;
@@ -95,6 +99,76 @@ export interface DevicePayload {
   sale_price: number | null;
   purchase_date: string | null;
   sale_date: string | null;
+  image_source_type: ImageSourceType | null;
+  image_original_url: string | null;
+  image_storage_path: string | null;
+  image_storage_name: string | null;
+}
+
+export interface WishlistDeviceListItem {
+  id: number;
+  name: string;
+  brand: string;
+  category: DeviceCategory;
+  mount_system_key: MountSystemKey | null;
+  mount_system_custom: string | null;
+  mount_system_label: string | null;
+  score: number;
+  rating_label: RatingLabel | null;
+  acquisition_iteration: number;
+  tags: string[];
+  image_source_type: ImageSourceType | null;
+  image_original_url: string | null;
+  image_storage_path: string | null;
+  image_storage_name: string | null;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WishlistDeviceDetail extends WishlistDeviceListItem {
+  pros: string[];
+  cons: string[];
+  review_detail: string;
+}
+
+export interface WishlistDevicePayload {
+  name: string;
+  brand: string;
+  category: DeviceCategory;
+  mount_system_key: MountSystemKey | null;
+  mount_system_custom: string | null;
+  score: number;
+  acquisition_iteration: number;
+  pros: string[];
+  cons: string[];
+  review_detail: string;
+  tags: string[];
+  image_source_type: ImageSourceType | null;
+  image_original_url: string | null;
+  image_storage_path: string | null;
+  image_storage_name: string | null;
+}
+
+export interface WishlistDeviceListResponse {
+  items: WishlistDeviceListItem[];
+  total: number;
+}
+
+export interface WishlistRedeemPayload {
+  name?: string;
+  brand?: string;
+  category?: DeviceCategory;
+  mount_system_key?: MountSystemKey | null;
+  mount_system_custom?: string | null;
+  score?: number;
+  acquisition_iteration?: number;
+  pros?: string[];
+  cons?: string[];
+  review_detail?: string;
+  tags?: string[];
+  purchase_price: number;
+  purchase_date: string;
   image_source_type: ImageSourceType | null;
   image_original_url: string | null;
   image_storage_path: string | null;
@@ -146,6 +220,15 @@ export interface DeviceFilters {
   sortOrder: SortOrder;
 }
 
+export interface WishlistFilters {
+  search: string;
+  category: DeviceCategory | "";
+  rating: RatingLabel | "";
+  feelingOnly: boolean;
+  sortBy: WishlistSortBy;
+  sortOrder: SortOrder;
+}
+
 export interface LeaderboardBaseItem {
   rank: number;
   device_id: number;
@@ -153,6 +236,7 @@ export interface LeaderboardBaseItem {
   brand: string;
   score: number;
   rating_label: RatingLabel | null;
+  daily_cost_value: number | null;
 }
 
 export interface HoldingDurationItem extends LeaderboardBaseItem {
@@ -198,6 +282,12 @@ export interface DataImportResponse {
   errors: DataImportError[];
 }
 
+export interface DataResetResponse {
+  devices_deleted: number;
+  wishlist_deleted: number;
+  media_files_deleted: number;
+}
+
 export const CATEGORY_LABELS: Record<DeviceCategory, string> = {
   camera_body: "机身",
   lens: "镜头",
@@ -234,7 +324,7 @@ export const MOUNT_SYSTEM_LABELS: Record<MountSystemKey, string> = {
   l: "L",
   m43: "M43",
   m42: "M42",
-  other: "其他（可输入）"
+  other: "其他(可输入)"
 };
 
 export const DEFAULT_FILTERS: DeviceFilters = {
@@ -245,5 +335,14 @@ export const DEFAULT_FILTERS: DeviceFilters = {
   feelingOnly: false,
   purchaseYear: "",
   sortBy: "purchase_date",
+  sortOrder: "desc"
+};
+
+export const DEFAULT_WISHLIST_FILTERS: WishlistFilters = {
+  search: "",
+  category: "",
+  rating: "",
+  feelingOnly: false,
+  sortBy: "updated_at",
   sortOrder: "desc"
 };

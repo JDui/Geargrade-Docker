@@ -18,9 +18,17 @@ export function formatDeviceTitle(device: Pick<DeviceListItem, "name" | "acquisi
   return `${device.name}${formatAcquisitionSuperscript(device.acquisition_iteration)}`;
 }
 
+export function isFeelingScore(score: number): boolean {
+  return score === -1;
+}
+
+export function isUnratedScore(score: number): boolean {
+  return score === 0;
+}
+
 export function ratingLabelText(rating: RatingLabel | null): string {
   if (!rating) {
-    return "正在感受";
+    return "暂不做评价";
   }
   return RATING_LABELS[rating];
 }
@@ -28,6 +36,10 @@ export function ratingLabelText(rating: RatingLabel | null): string {
 export function ratingGlyphText(rating: RatingLabel | null, score: number): string {
   if (isFeelingScore(score)) {
     return "感";
+  }
+
+  if (isUnratedScore(score)) {
+    return "暂";
   }
 
   return {
@@ -38,12 +50,8 @@ export function ratingGlyphText(rating: RatingLabel | null, score: number): stri
   }[rating ?? "average"];
 }
 
-export function isFeelingScore(score: number): boolean {
-  return score === -1;
-}
-
 export function scoreToRatingLabel(score: number): RatingLabel | null {
-  if (isFeelingScore(score)) return null;
+  if (isFeelingScore(score) || isUnratedScore(score)) return null;
   if (score > 100) return "god";
   if (score >= 80) return "excellent";
   if (score >= 50) return "average";

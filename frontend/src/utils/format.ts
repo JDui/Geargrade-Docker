@@ -9,6 +9,21 @@ export function formatCurrency(value: number | null | undefined): string {
   }).format(value);
 }
 
+export function formatDailyCost(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) {
+    return "未计算";
+  }
+
+  const prefix = value > 0 ? "" : value < 0 ? "-" : "";
+  const absValue = Math.abs(value);
+  const amount = new Intl.NumberFormat("zh-CN", {
+    style: "currency",
+    currency: "CNY",
+    maximumFractionDigits: absValue >= 100 ? 0 : 1
+  }).format(absValue);
+  return `${prefix}${amount}/天`;
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) {
     return "未记录";

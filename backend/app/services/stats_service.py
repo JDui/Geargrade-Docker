@@ -8,6 +8,7 @@ from app.core.enums import (
     DeviceStatus,
     RatingLabel,
     is_feeling_score,
+    is_unrated_score,
     rating_label_from_score,
 )
 from app.models.device import Device
@@ -94,7 +95,7 @@ def _purchase_year_rating_breakdown(
 
     counts_by_year: dict[int, Counter[RatingLabel]] = defaultdict(Counter)
     for year, score in rows:
-        if year is None or score is None or is_feeling_score(score):
+        if year is None or score is None or is_feeling_score(score) or is_unrated_score(score):
             continue
         label = rating_label_from_score(score)
         if label is None:
@@ -124,7 +125,7 @@ def get_dashboard_summary(session: Session) -> DashboardSummary:
     rating_counter = Counter(
         label
         for score in scores
-        if not is_feeling_score(score)
+        if not is_feeling_score(score) and not is_unrated_score(score)
         for label in [rating_label_from_score(score)]
         if label is not None
     )

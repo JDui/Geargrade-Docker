@@ -1,13 +1,5 @@
 import { useMemo } from "react";
-import {
-  Bar,
-  BarChart,
-  LabelList,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
+import { Bar, BarChart, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import {
   CATEGORY_LABELS,
@@ -47,20 +39,14 @@ const ratingPalette: Record<RatingLabel, string> = {
 };
 
 function breakdownLabel(mode: AnnualBreakdownMode, key: string) {
-  return mode === "category"
-    ? CATEGORY_LABELS[key as DeviceCategory]
-    : RATING_LABELS[key as RatingLabel];
+  return mode === "category" ? CATEGORY_LABELS[key as DeviceCategory] : RATING_LABELS[key as RatingLabel];
 }
 
 function toBreakdownMap<T extends string>(items: PurchaseYearBreakdown<T>[]) {
   return new Map(items.map((item) => [item.year, item.buckets]));
 }
 
-function toRow<T extends string>(
-  total: PurchaseYearBucket,
-  buckets: DashboardBucket<T>[] | undefined,
-  keys: T[]
-) {
+function toRow<T extends string>(total: PurchaseYearBucket, buckets: DashboardBucket<T>[] | undefined, keys: T[]) {
   return keys.reduce(
     (row, key) => ({
       ...row,
@@ -100,7 +86,7 @@ export function AnnualPurchaseChart({
 
   if (!totals.length) {
     return (
-      <div className="flex h-[320px] items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt/60 text-sm text-textSecondary">
+      <div className="annual-chart-frame flex items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt/60 text-sm text-textSecondary">
         暂无可统计的年度购买记录
       </div>
     );
@@ -108,19 +94,19 @@ export function AnnualPurchaseChart({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-textSecondary">按年份查看购买数量与构成变化</div>
-        <div className="inline-flex rounded-full border border-line bg-panelAlt/80 p-1">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm text-textSecondary">按年份查看购买数量，以及设备分布和等级分布的变化趋势。</div>
+        <div className="annual-mode-switch">
           <button
             type="button"
-            className={mode === "category" ? "button-primary px-3 py-1.5 text-xs" : "button-secondary px-3 py-1.5 text-xs"}
+            className={mode === "category" ? "button-primary px-3 py-1.5 text-xs motion-lift" : "button-secondary px-3 py-1.5 text-xs motion-lift"}
             onClick={() => onModeChange("category")}
           >
             设备分布
           </button>
           <button
             type="button"
-            className={mode === "rating" ? "button-primary px-3 py-1.5 text-xs" : "button-secondary px-3 py-1.5 text-xs"}
+            className={mode === "rating" ? "button-primary px-3 py-1.5 text-xs motion-lift" : "button-secondary px-3 py-1.5 text-xs motion-lift"}
             onClick={() => onModeChange("rating")}
           >
             等级分布
@@ -128,28 +114,18 @@ export function AnnualPurchaseChart({
         </div>
       </div>
 
-      <div className="h-[270px]">
+      <div className="annual-chart-frame rounded-[1.6rem] border border-line/70 bg-panelAlt/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartConfig.rows} margin={{ top: 18, right: 8, left: -20, bottom: 8 }}>
-            <XAxis
-              dataKey="year"
-              tick={{ fill: "rgb(var(--color-text-secondary))", fontSize: 12 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              allowDecimals={false}
-              tick={{ fill: "rgb(var(--color-text-secondary))", fontSize: 12 }}
-              axisLine={false}
-              tickLine={false}
-            />
+          <BarChart data={chartConfig.rows} margin={{ top: 28, right: 12, left: -18, bottom: 10 }}>
+            <XAxis dataKey="year" tick={{ fill: "rgb(var(--color-text-secondary))", fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis allowDecimals={false} tick={{ fill: "rgb(var(--color-text-secondary))", fontSize: 12 }} axisLine={false} tickLine={false} width={28} />
             <Tooltip
               contentStyle={{
                 background: "var(--tooltip-bg)",
                 border: "1px solid var(--tooltip-border)",
-                borderRadius: "12px",
+                borderRadius: "14px",
                 color: "rgb(var(--color-text-primary))",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.18)"
+                boxShadow: "0 18px 40px rgba(0,0,0,0.24)"
               }}
               formatter={(value: number, key: string) => [`${value}`, breakdownLabel(mode, key)]}
               labelFormatter={(label, payload) => {
@@ -167,16 +143,19 @@ export function AnnualPurchaseChart({
                 dataKey={key}
                 stackId="annual"
                 fill={chartConfig.palette[key as keyof typeof chartConfig.palette] as string}
-                radius={[key === chartConfig.keys[chartConfig.keys.length - 1] ? 10 : 0, key === chartConfig.keys[chartConfig.keys.length - 1] ? 10 : 0, 0, 0]}
-                maxBarSize={36}
+                radius={[
+                  key === chartConfig.keys[chartConfig.keys.length - 1] ? 10 : 0,
+                  key === chartConfig.keys[chartConfig.keys.length - 1] ? 10 : 0,
+                  0,
+                  0
+                ]}
+                maxBarSize={38}
+                isAnimationActive
+                animationDuration={1100}
+                animationEasing="ease-out"
               >
                 {key === chartConfig.keys[chartConfig.keys.length - 1] ? (
-                  <LabelList
-                    dataKey="total"
-                    position="top"
-                    fill="rgb(var(--color-text-primary))"
-                    fontSize={12}
-                  />
+                  <LabelList dataKey="total" position="top" offset={8} fill="rgb(var(--color-text-primary))" fontSize={12} />
                 ) : null}
               </Bar>
             ))}

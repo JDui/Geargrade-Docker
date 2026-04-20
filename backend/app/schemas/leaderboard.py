@@ -10,6 +10,7 @@ class LeaderboardBaseItem(BaseModel):
     brand: str
     score: int
     rating_label: RatingLabel | None
+    daily_cost_value: float | None = None
 
 
 class HoldingDurationItem(LeaderboardBaseItem):

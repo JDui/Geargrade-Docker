@@ -14,7 +14,7 @@ from app.schemas.leaderboard import (
     ScoreLeaderboardItem,
     ScoreLeaderboardResponse,
 )
-from app.services.device_service import _score_ranking_key
+from app.services.device_service import _score_ranking_key, calculate_daily_cost_value
 
 
 ACTIVE_STATUSES = {DeviceStatus.HOLDING, DeviceStatus.FOR_SALE}
@@ -44,6 +44,13 @@ def get_holding_duration_leaderboard(session: Session, sort_order: SortOrder = "
                 brand=device.brand,
                 score=device.score,
                 rating_label=rating_label_from_score(device.score),
+                daily_cost_value=calculate_daily_cost_value(
+                    device.status,
+                    device.purchase_price,
+                    device.purchase_date,
+                    device.sale_price,
+                    device.sale_date,
+                ),
                 duration_days=duration_days,
                 purchase_date=device.purchase_date.isoformat() if device.purchase_date else None,
                 sale_date=device.sale_date.isoformat() if device.sale_date else None,
@@ -58,7 +65,7 @@ def get_holding_duration_leaderboard(session: Session, sort_order: SortOrder = "
 
 
 def get_score_leaderboard(session: Session, sort_order: SortOrder = "desc") -> ScoreLeaderboardResponse:
-    devices = session.scalars(select(Device).where(Device.score >= 0)).all()
+    devices = session.scalars(select(Device).where(Device.score > 0)).all()
     if sort_order == "desc":
         devices = sorted(devices, key=_score_ranking_key)
     else:
@@ -74,6 +81,13 @@ def get_score_leaderboard(session: Session, sort_order: SortOrder = "desc") -> S
             brand=device.brand,
             score=device.score,
             rating_label=rating_label_from_score(device.score),
+            daily_cost_value=calculate_daily_cost_value(
+                device.status,
+                device.purchase_price,
+                device.purchase_date,
+                device.sale_price,
+                device.sale_date,
+            ),
         )
         for index, device in enumerate(devices, 1)
     ]
@@ -97,6 +111,13 @@ def get_finance_leaderboard(session: Session, sort_order: SortOrder = "desc") ->
             brand=device.brand,
             score=device.score,
             rating_label=rating_label_from_score(device.score),
+            daily_cost_value=calculate_daily_cost_value(
+                device.status,
+                device.purchase_price,
+                device.purchase_date,
+                device.sale_price,
+                device.sale_date,
+            ),
             profit_value=float(device.sale_price or 0) - float(device.purchase_price or 0),
             purchase_price=device.purchase_price,
             sale_price=device.sale_price,

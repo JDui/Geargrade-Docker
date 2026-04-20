@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMatch, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
@@ -14,8 +14,8 @@ import {
   type ScoreLeaderboardItem,
   type SortOrder
 } from "../types/device";
-import { formatCurrency, formatDate, formatDurationDays } from "../utils/format";
 import { ratingLabelText } from "../utils/device";
+import { formatCurrency, formatDailyCost, formatDate, formatDurationDays } from "../utils/format";
 
 type RankedEntry = {
   rank: number;
@@ -48,7 +48,7 @@ function normalizeEntries(
       name: item.name,
       brand: item.brand,
       headline: formatDurationDays(item.duration_days),
-      meta: `${formatDate(item.purchase_date)} 至 ${item.sale_date ? formatDate(item.sale_date) : "现在"}`
+      meta: `${formatDate(item.purchase_date)} 至 ${item.sale_date ? formatDate(item.sale_date) : "现在"} · ${formatDailyCost(item.daily_cost_value)}`
     }));
   }
 
@@ -59,7 +59,7 @@ function normalizeEntries(
       name: item.name,
       brand: item.brand,
       headline: `${item.profit_value >= 0 ? "+" : ""}${formatCurrency(item.profit_value)}`,
-      meta: `买入 ${formatCurrency(item.purchase_price)} / 卖出 ${formatCurrency(item.sale_price)}`
+      meta: `买入 ${formatCurrency(item.purchase_price)} / 卖出 ${formatCurrency(item.sale_price)} · ${formatDailyCost(item.daily_cost_value)}`
     }));
   }
 
@@ -69,7 +69,7 @@ function normalizeEntries(
     name: item.name,
     brand: item.brand,
     headline: `${item.score}`,
-    meta: ratingLabelText(item.rating_label)
+    meta: `${ratingLabelText(item.rating_label)} · ${formatDailyCost(item.daily_cost_value)}`
   }));
 }
 
@@ -77,6 +77,12 @@ function podiumTone(rank: number) {
   if (rank === 1) return "podium-rank-1";
   if (rank === 2) return "podium-rank-2";
   return "podium-rank-3";
+}
+
+function podiumPlacement(rank: number) {
+  if (rank === 1) return "order-1 lg:order-2";
+  if (rank === 2) return "order-2 lg:order-1";
+  return "order-3 lg:order-3";
 }
 
 function PodiumCard({
@@ -89,7 +95,7 @@ function PodiumCard({
   return (
     <button
       type="button"
-      className={`podium-card ${podiumTone(entry.rank)} text-left`}
+      className={`podium-card ${podiumTone(entry.rank)} ${podiumPlacement(entry.rank)} text-left`}
       onClick={() => onOpen(entry.deviceId)}
     >
       <div className="flex items-start justify-between gap-3">
@@ -204,10 +210,7 @@ export default function LeaderboardsPage() {
         : financeItems;
 
   const entries = normalizeEntries(tab, activeItems);
-  const podiumEntries = useMemo(
-    () => [entries[1], entries[0], entries[2]].filter((entry): entry is RankedEntry => Boolean(entry)),
-    [entries]
-  );
+  const podiumEntries = entries.slice(0, 3);
   const restEntries = entries.slice(3);
   const currentSearch = searchParams.toString();
 
@@ -236,7 +239,7 @@ export default function LeaderboardsPage() {
               <div className="text-xs uppercase tracking-[0.24em] text-accent/80">排行榜</div>
               <h1 className="mt-2 text-4xl font-black tracking-tight text-textPrimary">排行榜</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-textSecondary">
-                用排名视角查看器材偏好、持有时间和买卖结果。
+                用排名视角查看器材偏好、持有时间和买卖结果，每日成本也会一起显示。
               </p>
             </div>
 
@@ -274,9 +277,7 @@ export default function LeaderboardsPage() {
       </section>
 
       {error ? (
-        <div className="rounded-2xl border border-danger/40 bg-danger/10 p-4 text-danger">
-          {error}
-        </div>
+        <div className="rounded-2xl border border-danger/40 bg-danger/10 p-4 text-danger">{error}</div>
       ) : null}
 
       <section className="panel p-6">
@@ -285,16 +286,12 @@ export default function LeaderboardsPage() {
             <div className="text-xs uppercase tracking-[0.22em] text-accent/80">{tabLabel(tab)}</div>
             <h2 className="mt-1 text-2xl font-semibold text-textPrimary">Top 3</h2>
           </div>
-          <div className="text-sm text-textSecondary">
-            当前按 {sortOrder === "desc" ? "降序" : "升序"} 展示
-          </div>
+          <div className="text-sm text-textSecondary">当前按 {sortOrder === "desc" ? "降序" : "升序"} 展示</div>
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[0.92fr,1.14fr,0.98fr] lg:items-end">
           {podiumEntries.length ? (
-            podiumEntries.map((entry) => (
-              <PodiumCard key={entry.deviceId} entry={entry} onOpen={openDetail} />
-            ))
+            podiumEntries.map((entry) => <PodiumCard key={entry.deviceId} entry={entry} onOpen={openDetail} />)
           ) : (
             <div className="col-span-full rounded-2xl border border-line bg-panelAlt/70 p-6 text-textSecondary">
               暂无榜单数据。

@@ -24,9 +24,9 @@ export function StringListEditor({ value, onChange, placeholder }: StringListEdi
     <div className="rounded-2xl border border-line bg-panelAlt px-3 py-3">
       <div className="flex flex-wrap gap-2">
         {value.length ? (
-          value.map((item) => (
+          value.map((item, index) => (
             <button
-              key={`${item}-${value.indexOf(item)}`}
+              key={`${item}-${index}`}
               type="button"
               className="rounded-full border border-line px-3 py-1 text-sm text-textPrimary transition hover:border-danger/40 hover:text-danger"
               onClick={() => removeItem(item)}
@@ -40,7 +40,7 @@ export function StringListEditor({ value, onChange, placeholder }: StringListEdi
       </div>
       <div className="mt-3 flex gap-2">
         <input
-          className="field"
+          className="input"
           value={draft}
           placeholder={placeholder}
           onChange={(event) => setDraft(event.target.value)}

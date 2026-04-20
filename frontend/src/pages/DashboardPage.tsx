@@ -1,281 +1,258 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMatch, useNavigate } from "react-router-dom";
 
 import { fetchDevices } from "../api/devices";
 import { AnnualPurchaseChart } from "../components/dashboard/AnnualPurchaseChart";
 import { CategoryDonutChart } from "../components/dashboard/CategoryDonutChart";
 import { RatingBarChart } from "../components/dashboard/RatingBarChart";
-import { DeviceCard } from "../components/devices/DeviceCard";
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
-import { DeviceTable } from "../components/devices/DeviceTable";
-import { DeviceFiltersBar } from "../components/filters/DeviceFiltersBar";
 import { useDashboardSummary } from "../components/layout/DashboardSummaryProvider";
-import {
-  DEFAULT_FILTERS,
-  STATUS_LABELS,
-  type AnnualBreakdownMode,
-  type DeviceFilters,
-  type DeviceListItem,
-  type ViewMode
-} from "../types/device";
-import { formatDate } from "../utils/format";
-import { formatDeviceTitle, isFeelingScore, ratingLabelText } from "../utils/device";
+import { useAnimatedRouteClose } from "../hooks/useAnimatedRouteClose";
+import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
+import { STATUS_LABELS, type AnnualBreakdownMode, type DeviceListItem } from "../types/device";
+import { formatDailyCost, formatDate } from "../utils/format";
+import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../utils/device";
 
 const HOLDING_STATUSES = new Set(["holding", "for_sale"]);
 
-export default function DashboardPage() {
-  const tableSortFields = new Set([
-    "name",
-    "category",
-    "status",
-    "score",
-    "purchase_price",
-    "purchase_date",
-    "sale_date"
-  ]);
-  const navigate = useNavigate();
-  const drawerMatch = useMatch("/devices/:deviceId");
-  const { summary, refreshSummary } = useDashboardSummary();
-  const [devices, setDevices] = useState<DeviceListItem[]>([]);
-  const [currentHoldingDevices, setCurrentHoldingDevices] = useState<DeviceListItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [filters, setFilters] = useState<DeviceFilters>(DEFAULT_FILTERS);
-  const [viewMode, setViewMode] = useState<ViewMode>("cards");
-  const [annualMode, setAnnualMode] = useState<AnnualBreakdownMode>("category");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const deferredSearch = useDeferredValue(filters.search);
-  const effectiveFilters = useMemo(
-    () => ({ ...filters, search: deferredSearch }),
-    [filters, deferredSearch]
+function OverviewTeaser({ device, onOpen }: { device: DeviceListItem; onOpen: () => void }) {
+  const feeling = isFeelingScore(device.score);
+  const unrated = isUnratedScore(device.score);
+
+  return (
+    <button type="button" className="overview-teaser-card motion-lift" onClick={onOpen}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-base font-semibold text-textPrimary">{formatDeviceTitle(device)}</div>
+          <div className="mt-1 text-sm text-textSecondary">{device.brand}</div>
+        </div>
+        <span className="rounded-full bg-success/12 px-2.5 py-1 text-xs font-medium text-success">
+          {STATUS_LABELS[device.status]}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div>
+          <div className="overview-teaser-label">购入日期</div>
+          <div className="overview-teaser-value">{formatDate(device.purchase_date)}</div>
+        </div>
+        <div>
+          <div className="overview-teaser-label">评分</div>
+          <div className="overview-teaser-value">
+            {feeling ? "感受中" : unrated ? "暂不做评价" : `${device.score} / ${ratingLabelText(device.rating_label)}`}
+          </div>
+        </div>
+        <div>
+          <div className="overview-teaser-label">每日成本</div>
+          <div className="overview-teaser-value">{formatDailyCost(device.daily_cost_value)}</div>
+        </div>
+      </div>
+    </button>
   );
+}
 
-  const availablePurchaseYears = useMemo(() => {
-    const years = (summary?.purchase_years ?? []).map((item) => item.year);
-    if (!years.length) {
-      return [];
-    }
+export default function DashboardPage() {
+  const navigate = useNavigate();
+  const directDrawerMatch = useMatch("/devices/:deviceId");
+  const holdingDrawerMatch = useMatch("/holding");
+  const holdingDetailMatch = useMatch("/holding/devices/:deviceId");
+  const { summary, refreshSummary } = useDashboardSummary();
+  const [currentHoldingDevices, setCurrentHoldingDevices] = useState<DeviceListItem[]>([]);
+  const [annualMode, setAnnualMode] = useState<AnnualBreakdownMode>("category");
+  const holdingPreviewDevices = useMemo(() => currentHoldingDevices.slice(0, 3), [currentHoldingDevices]);
+  const { isClosing, requestClose } = useAnimatedRouteClose();
 
-    const minYear = Math.min(...years);
-    const maxYear = Math.max(...years);
-    const options: number[] = [];
-    for (let year = maxYear; year >= minYear; year -= 1) {
-      options.push(year);
-    }
-    return options;
-  }, [summary]);
-
-  function handleTableSort(nextSortBy: DeviceFilters["sortBy"]) {
-    setFilters((current) => ({
-      ...current,
-      sortBy: nextSortBy,
-      sortOrder:
-        current.sortBy === nextSortBy && current.sortOrder === "desc" ? "asc" : "desc"
-    }));
-  }
-
-  function handleViewModeChange(nextViewMode: ViewMode) {
-    setViewMode(nextViewMode);
-    if (nextViewMode === "table" && !tableSortFields.has(filters.sortBy)) {
-      setFilters((current) => ({
-        ...current,
-        sortBy: "purchase_date",
-        sortOrder: "desc"
-      }));
-    }
-  }
-
-  async function loadDevices(activeFilters: DeviceFilters) {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await fetchDevices(activeFilters);
-      setDevices(result.items);
-      setTotal(result.total);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "加载设备列表失败。");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const isHoldingDrawerVisible = Boolean(holdingDrawerMatch || holdingDetailMatch);
+  useBodyScrollLock(isHoldingDrawerVisible);
 
   async function loadCurrentHoldingDevices() {
     try {
-      const result = await fetchDevices(DEFAULT_FILTERS);
-      setCurrentHoldingDevices(
-        result.items.filter((device) => HOLDING_STATUSES.has(device.status)).slice(0, 4)
-      );
+      const result = await fetchDevices({
+        search: "",
+        category: "",
+        status: "",
+        rating: "",
+        feelingOnly: false,
+        purchaseYear: "",
+        sortBy: "purchase_date",
+        sortOrder: "desc"
+      });
+      setCurrentHoldingDevices(result.items.filter((device) => HOLDING_STATUSES.has(device.status)));
     } catch {
       setCurrentHoldingDevices([]);
     }
   }
 
   useEffect(() => {
-    loadDevices(effectiveFilters).catch(() => undefined);
-  }, [effectiveFilters]);
-
-  useEffect(() => {
     loadCurrentHoldingDevices().catch(() => undefined);
   }, []);
 
-  return (
-    <div className="space-y-5 sm:space-y-6">
-      <section className="grid gap-4 xl:grid-cols-[0.92fr,1.08fr]">
-        <div className="grid gap-4">
-          <section className="panel p-4 sm:p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">评价等级分布</div>
-            <div className="mt-4">
-              {summary ? <RatingBarChart data={summary.ratings} /> : <div className="text-textSecondary">加载中...</div>}
-            </div>
-          </section>
+  function closeHoldingDrawer() {
+    requestClose(() => navigate("/"));
+  }
 
-          <section className="panel p-4 sm:p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">设备类别分布</div>
-            <div className="mt-4">
-              {summary ? (
-                <CategoryDonutChart data={summary.categories} />
-              ) : (
-                <div className="text-textSecondary">加载中...</div>
-              )}
-            </div>
-          </section>
-        </div>
+  const holdingDrawer = isHoldingDrawerVisible && typeof document !== "undefined"
+    ? createPortal(
+        <>
+          <button
+            type="button"
+            className={`drawer-overlay ${isClosing ? "motion-fade-out" : "motion-fade-in"}`}
+            onClick={closeHoldingDrawer}
+            aria-label="关闭当前持有设备抽屉"
+          />
+          <aside className={`drawer-panel drawer-panel-shell drawer-panel-wide ${isClosing ? "motion-slide-out-right" : "motion-slide-in-right"}`}>
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="drawer-header">
+                <div>
+                  <div className="dashboard-kicker">Holding Collection</div>
+                  <h2 className="mt-1 text-xl font-semibold text-textPrimary sm:text-2xl">当前持有设备</h2>
+                  <p className="mt-2 text-sm text-textSecondary">这里汇总所有持有中和待售设备，点入设备详情会在这一层之上继续展开。</p>
+                </div>
+                <button type="button" className="button-secondary motion-lift" onClick={closeHoldingDrawer}>
+                  关闭
+                </button>
+              </div>
 
-        <div className="grid gap-4">
-          <section className="panel p-4 sm:p-5">
-            <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">年度购买量</div>
-            <div className="mt-4">
-              {summary ? (
-                <AnnualPurchaseChart
-                  totals={summary.purchase_years}
-                  categoryBreakdown={summary.purchase_year_category_breakdown}
-                  ratingBreakdown={summary.purchase_year_rating_breakdown}
-                  mode={annualMode}
-                  onModeChange={setAnnualMode}
-                />
-              ) : (
-                <div className="text-textSecondary">加载中...</div>
-              )}
-            </div>
-          </section>
-
-          <section className="panel p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs uppercase tracking-[0.2em] text-textSecondary">当前持有设备</div>
-              <div className="text-xs text-textSecondary">
-                {summary?.currently_owned_count ?? currentHoldingDevices.length} 台
+              <div className="drawer-content flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+                <div className="grid gap-3">
+                  {currentHoldingDevices.map((device, index) => (
+                    <div key={device.id} className="motion-enter" style={{ animationDelay: `${120 + index * 70}ms` }}>
+                      <OverviewTeaser device={device} onOpen={() => navigate(`/holding/devices/${device.id}`)} />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+          </aside>
+        </>,
+        document.body
+      )
+    : null;
 
-            <div className="mt-4 grid gap-3">
-              {currentHoldingDevices.length ? (
-                currentHoldingDevices.map((device) => (
-                  <button
-                    key={device.id}
-                    type="button"
-                    className="rounded-2xl border border-line bg-panelAlt/70 p-3.5 text-left transition hover:border-accent/30 hover:bg-panelAlt sm:p-4"
-                    onClick={() => navigate(`/devices/${device.id}`)}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-textPrimary">
-                          {formatDeviceTitle(device)}
-                        </div>
-                        <div className="mt-1 text-xs text-textSecondary">{device.brand}</div>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-success/12 px-2.5 py-1 text-xs font-medium text-success">
-                        {STATUS_LABELS[device.status]}
-                      </span>
-                    </div>
+  return (
+    <div className="space-y-4 lg:space-y-5">
+      <section className="dashboard-hero dashboard-hero-compact motion-enter motion-delay-0">
+        <div className="dashboard-hero-topline">
+          <div className="dashboard-hero-title-block">
+            <div className="dashboard-kicker">Overview Console</div>
+            <h1 className="dashboard-hero-title dashboard-hero-title-compact">概览</h1>
+          </div>
 
-                    <div className="mt-4 flex items-end justify-between gap-3">
-                      <div>
-                        <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">
-                          购入日期
-                        </div>
-                        <div className="mt-1 text-sm text-textPrimary">
-                          {formatDate(device.purchase_date)}
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">
-                          评分
-                        </div>
-                        <div className="mt-1 text-sm font-medium text-textPrimary">
-                          {isFeelingScore(device.score)
-                            ? "感受中"
-                            : `${device.score} / ${ratingLabelText(device.rating_label)}`}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="col-span-full rounded-2xl border border-dashed border-line bg-panelAlt/60 px-4 py-8 text-center text-sm text-textSecondary">
-                  暂无当前持有设备
-                </div>
-              )}
+          <div className="dashboard-hero-side dashboard-hero-side-inline">
+            <div className="dashboard-signal-card dashboard-signal-card-compact motion-enter motion-delay-1">
+              <div className="dashboard-signal-label">当前持有</div>
+              <div className="dashboard-signal-value dashboard-signal-value-compact">
+                {summary?.currently_owned_count ?? currentHoldingDevices.length}
+              </div>
             </div>
-          </section>
+            <div className="dashboard-signal-card dashboard-signal-card-compact motion-enter motion-delay-2">
+              <div className="dashboard-signal-label">已售设备</div>
+              <div className="dashboard-signal-value dashboard-signal-value-compact">{summary?.sold_count ?? "--"}</div>
+            </div>
+            <div className="dashboard-signal-card dashboard-signal-card-compact motion-enter motion-delay-3">
+              <div className="dashboard-signal-label">正在感受</div>
+              <div className="dashboard-signal-value dashboard-signal-value-compact">
+                {summary?.feeling_in_progress_count ?? "--"}
+              </div>
+            </div>
+          </div>
         </div>
+
+        <div className="dashboard-hero-actions dashboard-hero-actions-compact">
+          <button type="button" className="button-primary motion-lift" onClick={() => navigate("/archive")}>
+            进入档案库
+          </button>
+        </div>
+        <div className="dashboard-hero-glow" />
       </section>
 
-      <DeviceFiltersBar
-        filters={filters}
-        viewMode={viewMode}
-        availablePurchaseYears={availablePurchaseYears}
-        onFiltersChange={setFilters}
-        onViewModeChange={handleViewModeChange}
-      />
-
-      <section className="flex items-center justify-between">
-        <div>
-          <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">设备库</div>
-          <h1 className="mt-1 text-2xl font-semibold text-textPrimary">共 {total} 条设备档案</h1>
-        </div>
-      </section>
-
-      {error ? (
-        <div className="rounded-2xl border border-danger/40 bg-danger/10 p-4 text-danger">
-          {error}
-        </div>
-      ) : null}
-
-      {loading ? <div className="panel p-5 text-textSecondary">正在加载设备列表...</div> : null}
-
-      {!loading && !devices.length ? (
-        <div className="panel p-8 text-center">
-          <div className="text-lg font-medium text-textPrimary">没有匹配到设备</div>
-          <p className="mt-2 text-sm text-textSecondary">
-            尝试放宽筛选条件，或者先添加第一条设备档案。
-          </p>
-        </div>
-      ) : null}
-
-      {!loading && devices.length ? (
-        viewMode === "cards" ? (
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {devices.map((device) => (
-              <DeviceCard key={device.id} device={device} />
-            ))}
-          </section>
-        ) : (
-          <DeviceTable
-            items={devices}
-            sortBy={filters.sortBy}
-            sortOrder={filters.sortOrder}
-            onSortChange={handleTableSort}
+      <section className="dashboard-overview-grid dashboard-overview-grid-compact">
+        <section className="dashboard-panel dashboard-panel-primary motion-enter motion-delay-1">
+          <div className="dashboard-panel-header">
+            <div>
+              <div className="dashboard-panel-kicker">Annual Pulse</div>
+              <h2 className="dashboard-panel-title">年度购买量</h2>
+            </div>
+            <div className="dashboard-panel-meta">按年份查看购买节奏，以及设备分布和等级分布的变化。</div>
+          </div>
+          <AnnualPurchaseChart
+            totals={summary?.purchase_years ?? []}
+            categoryBreakdown={summary?.purchase_year_category_breakdown ?? []}
+            ratingBreakdown={summary?.purchase_year_rating_breakdown ?? []}
+            mode={annualMode}
+            onModeChange={setAnnualMode}
           />
-        )
-      ) : null}
+        </section>
 
-      {drawerMatch?.params.deviceId ? (
+        <section className="dashboard-panel dashboard-panel-secondary motion-enter motion-delay-2">
+          <div className="dashboard-panel-header">
+            <div>
+              <div className="dashboard-panel-kicker">Rating Structure</div>
+              <h2 className="dashboard-panel-title">评价等级分布</h2>
+            </div>
+          </div>
+          {summary ? <RatingBarChart data={summary.ratings} /> : <div className="text-textSecondary">加载中...</div>}
+        </section>
+
+        <section className="dashboard-panel dashboard-panel-secondary motion-enter motion-delay-3">
+          <div className="dashboard-panel-header">
+            <div>
+              <div className="dashboard-panel-kicker">Category Weight</div>
+              <h2 className="dashboard-panel-title">设备类别分布</h2>
+            </div>
+          </div>
+          {summary ? <CategoryDonutChart data={summary.categories} /> : <div className="text-textSecondary">加载中...</div>}
+        </section>
+      </section>
+
+      <section className="dashboard-teaser-shell motion-enter motion-delay-4">
+        <div className="dashboard-panel-header">
+          <div>
+            <div className="dashboard-panel-kicker">Holding Snapshot</div>
+            <h2 className="dashboard-panel-title">当前持有设备</h2>
+          </div>
+          <button
+            type="button"
+            className="button-secondary motion-lift"
+            onClick={() => navigate("/holding")}
+            disabled={!currentHoldingDevices.length}
+          >
+            打开持有设备抽屉
+          </button>
+        </div>
+
+        {holdingPreviewDevices.length ? (
+          <div className="dashboard-teaser-strip">
+            {holdingPreviewDevices.map((device) => (
+              <OverviewTeaser key={device.id} device={device} onOpen={() => navigate(`/devices/${device.id}`)} />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-line bg-panelAlt/60 px-4 py-10 text-center text-sm text-textSecondary">
+            暂无当前持有设备
+          </div>
+        )}
+      </section>
+
+      {directDrawerMatch?.params.deviceId ? (
         <DeviceDetailDrawer
-          deviceId={drawerMatch.params.deviceId}
+          deviceId={directDrawerMatch.params.deviceId}
           closeTo="/"
           onChanged={() => {
-            loadDevices(effectiveFilters).catch(() => undefined);
+            loadCurrentHoldingDevices().catch(() => undefined);
+            refreshSummary().catch(() => undefined);
+          }}
+        />
+      ) : null}
+
+      {holdingDrawer}
+
+      {holdingDetailMatch?.params.deviceId ? (
+        <DeviceDetailDrawer
+          deviceId={holdingDetailMatch.params.deviceId}
+          closeTo="/holding"
+          onChanged={() => {
             loadCurrentHoldingDevices().catch(() => undefined);
             refreshSummary().catch(() => undefined);
           }}

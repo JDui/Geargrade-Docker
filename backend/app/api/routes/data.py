@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
-from app.schemas.data import DataExportResponse, DataImportRequest, DataImportResponse
-from app.services.data_service import export_data, import_data
+from app.schemas.data import DataExportResponse, DataImportRequest, DataImportResponse, DataResetResponse
+from app.services.data_service import export_data, import_data, reset_all_data
 
 
 router = APIRouter(prefix="/data", tags=["data"])
@@ -22,3 +22,11 @@ def import_database(
     settings: Settings = Depends(get_settings),
 ) -> DataImportResponse:
     return import_data(db, payload, settings)
+
+
+@router.post("/reset", response_model=DataResetResponse)
+def reset_database(
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DataResetResponse:
+    return reset_all_data(db, settings)
