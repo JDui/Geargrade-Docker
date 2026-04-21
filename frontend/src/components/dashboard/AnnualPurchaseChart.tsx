@@ -86,35 +86,15 @@ export function AnnualPurchaseChart({
 
   if (!totals.length) {
     return (
-      <div className="annual-chart-frame flex items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt/60 text-sm text-textSecondary">
+      <div className="annual-chart-frame flex items-center justify-center border border-dashed border-line bg-panelAlt/60 text-sm text-textSecondary">
         暂无可统计的年度购买记录
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm text-textSecondary">按年份查看购买数量，以及设备分布和等级分布的变化趋势。</div>
-        <div className="annual-mode-switch">
-          <button
-            type="button"
-            className={mode === "category" ? "button-primary px-3 py-1.5 text-xs motion-lift" : "button-secondary px-3 py-1.5 text-xs motion-lift"}
-            onClick={() => onModeChange("category")}
-          >
-            设备分布
-          </button>
-          <button
-            type="button"
-            className={mode === "rating" ? "button-primary px-3 py-1.5 text-xs motion-lift" : "button-secondary px-3 py-1.5 text-xs motion-lift"}
-            onClick={() => onModeChange("rating")}
-          >
-            等级分布
-          </button>
-        </div>
-      </div>
-
-      <div className="annual-chart-frame rounded-[1.6rem] border border-line/70 bg-panelAlt/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+    <div>
+      <div className="annual-chart-frame border border-line/70 bg-panelAlt/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartConfig.rows} margin={{ top: 28, right: 12, left: -18, bottom: 10 }}>
             <XAxis dataKey="year" tick={{ fill: "rgb(var(--color-text-secondary))", fontSize: 12 }} axisLine={false} tickLine={false} />
@@ -123,7 +103,7 @@ export function AnnualPurchaseChart({
               contentStyle={{
                 background: "var(--tooltip-bg)",
                 border: "1px solid var(--tooltip-border)",
-                borderRadius: "14px",
+                borderRadius: "0",
                 color: "rgb(var(--color-text-primary))",
                 boxShadow: "0 18px 40px rgba(0,0,0,0.24)"
               }}
@@ -143,12 +123,7 @@ export function AnnualPurchaseChart({
                 dataKey={key}
                 stackId="annual"
                 fill={chartConfig.palette[key as keyof typeof chartConfig.palette] as string}
-                radius={[
-                  key === chartConfig.keys[chartConfig.keys.length - 1] ? 10 : 0,
-                  key === chartConfig.keys[chartConfig.keys.length - 1] ? 10 : 0,
-                  0,
-                  0
-                ]}
+                radius={[0, 0, 0, 0]}
                 maxBarSize={38}
                 isAnimationActive
                 animationDuration={1100}

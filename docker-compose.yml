@@ -1,6 +1,6 @@
 services:
   app:
-    image: geargrade-docker-app:${APP_VERSION:-v0.2}
+    image: geargrade-docker-app:${APP_VERSION:-v0.4}
     build:
       context: .
       dockerfile: backend/Dockerfile

@@ -4,16 +4,16 @@ Geargrade 是一个面向个人摄影器材管理的自托管 Web 应用。它�
 
 当前版本已经支持主设备库、独立心愿池、数据导入导出、全量重置、本地与远程图片录入，以及围绕评分、持有时长和理财结果的可视化展示。
 
-## 累计更新（v0.2）
+## 累计更新（v0.4）
 
-本次 v0.2 主要是对前端交互、数据语义和离线交付方式做收口，重点变化如下：
+本次 v0.4 主要是对移动端布局、抽屉路由体验和交互动效稳定性做收口，重点变化如下：
 
-- 新增独立心愿池，和主设备库分离，避免混入统计与榜单
-- 评分语义改为数字化处理，支持 `-1` 感受中、`0` 暂不做评价，以及正常评分映射
-- 首页概览重做为仪表盘结构，补齐年度购买量、评价等级分布、类别分布和持有设备抽屉
-- 抽屉、详情页、表单和筛选区统一了样式与滚动行为，修复了多处错位与底色异常
-- 新增数据工具、五步确认重置、导入导出模板与结构化 JSON 工作流
-- Docker 镜像与 Release 资产改为版本号命名，避免继续使用 `latest`
+- 顶部导航与摘要卡片重新压缩布局，小屏下信息密度更高，切换主题和主导航更顺手
+- Dashboard 移动端重排为单列优先，年度图表、分布卡片和 teaser 面板减少挤压与溢出
+- 当前持有设备改为稳定的覆盖层路由，支持从概览抽屉继续打开设备详情并逐层返回
+- 详情抽屉挂载/卸载时机重做，修复关闭动画被打断、直接访问覆盖层路由异常等问题
+- 页面滚动锁改为引用计数，避免多层抽屉叠加时 body 滚动状态错乱
+- Release 离线镜像包、Compose 默认标签和文档示例同步升级到 `v0.4`
 
 ## 技术栈
 
@@ -117,13 +117,13 @@ deploy/
 如果你使用 Release 里的离线镜像包，先导入镜像：
 
 ```bash
-docker load -i geargrade-v0.2-linux-amd64.tar
+docker load -i geargrade-v0.4-linux-amd64.tar
 ```
 
 ARM 设备改为：
 
 ```bash
-docker load -i geargrade-v0.2-linux-arm64.tar
+docker load -i geargrade-v0.4-linux-arm64.tar
 ```
 
 然后使用以下 Compose 模板：
@@ -131,7 +131,7 @@ docker load -i geargrade-v0.2-linux-arm64.tar
 ```yaml
 services:
   geargrade:
-    image: geargrade:v0.2-amd64
+    image: geargrade:v0.4-amd64
     container_name: geargrade-app
     restart: unless-stopped
     ports:
@@ -147,7 +147,7 @@ volumes:
   geargrade_media:
 ```
 
-ARM 镜像标签改为 `geargrade:v0.2-arm64`。
+ARM 镜像标签改为 `geargrade:v0.4-arm64`。
 
 ## 环境变量
 

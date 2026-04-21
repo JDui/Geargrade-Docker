@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useMatch, useNavigate } from "react-router-dom";
+import { useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { fetchDevices } from "../api/devices";
 import { AnnualPurchaseChart } from "../components/dashboard/AnnualPurchaseChart";
@@ -15,6 +15,21 @@ import { formatDailyCost, formatDate } from "../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../utils/device";
 
 const HOLDING_STATUSES = new Set(["holding", "for_sale"]);
+const HOLDING_OVERLAY_STATE = {
+  backgroundLocation: {
+    pathname: "/",
+    search: "",
+    hash: ""
+  }
+};
+
+type OverlayRouteState = {
+  backgroundLocation?: {
+    pathname: string;
+    search?: string;
+    hash?: string;
+  };
+};
 
 function OverviewTeaser({ device, onOpen }: { device: DeviceListItem; onOpen: () => void }) {
   const feeling = isFeelingScore(device.score);
@@ -54,17 +69,28 @@ function OverviewTeaser({ device, onOpen }: { device: DeviceListItem; onOpen: ()
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeState = (location.state as OverlayRouteState | null) ?? null;
   const directDrawerMatch = useMatch("/devices/:deviceId");
   const holdingDrawerMatch = useMatch("/holding");
   const holdingDetailMatch = useMatch("/holding/devices/:deviceId");
   const { summary, refreshSummary } = useDashboardSummary();
   const [currentHoldingDevices, setCurrentHoldingDevices] = useState<DeviceListItem[]>([]);
   const [annualMode, setAnnualMode] = useState<AnnualBreakdownMode>("category");
-  const holdingPreviewDevices = useMemo(() => currentHoldingDevices.slice(0, 3), [currentHoldingDevices]);
-  const { isClosing, requestClose } = useAnimatedRouteClose();
 
-  const isHoldingDrawerVisible = Boolean(holdingDrawerMatch || holdingDetailMatch);
-  useBodyScrollLock(isHoldingDrawerVisible);
+  const holdingPreviewDevices = useMemo(() => currentHoldingDevices.slice(0, 3), [currentHoldingDevices]);
+  const isHoldingRoute = Boolean(holdingDrawerMatch || holdingDetailMatch);
+  const hasHoldingBackground = routeState?.backgroundLocation?.pathname === "/";
+  const isHoldingDrawerVisible = isHoldingRoute && hasHoldingBackground;
+  const { isClosing, isMounted, requestClose } = useAnimatedRouteClose(isHoldingDrawerVisible);
+
+  useBodyScrollLock(isMounted);
+
+  useEffect(() => {
+    if (isHoldingRoute && !hasHoldingBackground) {
+      navigate("/", { replace: true });
+    }
+  }, [hasHoldingBackground, isHoldingRoute, navigate]);
 
   async function loadCurrentHoldingDevices() {
     try {
@@ -92,46 +118,56 @@ export default function DashboardPage() {
     requestClose(() => navigate("/"));
   }
 
-  const holdingDrawer = isHoldingDrawerVisible && typeof document !== "undefined"
-    ? createPortal(
-        <>
-          <button
-            type="button"
-            className={`drawer-overlay ${isClosing ? "motion-fade-out" : "motion-fade-in"}`}
-            onClick={closeHoldingDrawer}
-            aria-label="关闭当前持有设备抽屉"
-          />
-          <aside className={`drawer-panel drawer-panel-shell drawer-panel-wide ${isClosing ? "motion-slide-out-right" : "motion-slide-in-right"}`}>
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="drawer-header">
-                <div>
-                  <div className="dashboard-kicker">Holding Collection</div>
-                  <h2 className="mt-1 text-xl font-semibold text-textPrimary sm:text-2xl">当前持有设备</h2>
-                  <p className="mt-2 text-sm text-textSecondary">这里汇总所有持有中和待售设备，点入设备详情会在这一层之上继续展开。</p>
-                </div>
-                <button type="button" className="button-secondary motion-lift" onClick={closeHoldingDrawer}>
-                  关闭
-                </button>
-              </div>
+  function openHoldingDrawer() {
+    navigate("/holding", { state: HOLDING_OVERLAY_STATE });
+  }
 
-              <div className="drawer-content flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
-                <div className="grid gap-3">
-                  {currentHoldingDevices.map((device, index) => (
-                    <div key={device.id} className="motion-enter" style={{ animationDelay: `${120 + index * 70}ms` }}>
-                      <OverviewTeaser device={device} onOpen={() => navigate(`/holding/devices/${device.id}`)} />
-                    </div>
-                  ))}
-                </div>
+  function openHoldingDevice(deviceId: number) {
+    navigate(`/holding/devices/${deviceId}`, { state: HOLDING_OVERLAY_STATE });
+  }
+
+  const holdingDrawer = isMounted && isHoldingDrawerVisible && typeof document !== "undefined"
+    ? createPortal(
+      <>
+        <button
+          type="button"
+          className={`drawer-overlay ${isClosing ? "motion-fade-out" : "motion-fade-in"}`}
+          onClick={closeHoldingDrawer}
+          aria-label="关闭当前持有设备抽屉"
+        />
+        <aside className={`drawer-panel drawer-panel-shell drawer-panel-wide ${isClosing ? "motion-slide-out-right" : "motion-slide-in-right"}`}>
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="drawer-header">
+              <div className="min-w-0">
+                <div className="dashboard-kicker">Holding Collection</div>
+                <h2 className="mt-1 text-xl font-semibold text-textPrimary sm:text-2xl">当前持有设备</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-textSecondary">
+                  这里汇总持有中和待售设备。点进设备详情后会在这一层之上继续展开，关闭时会逐层返回。
+                </p>
+              </div>
+              <button type="button" className="button-secondary motion-lift shrink-0" onClick={closeHoldingDrawer}>
+                关闭
+              </button>
+            </div>
+
+            <div className="drawer-content flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+              <div className="grid gap-3">
+                {currentHoldingDevices.map((device, index) => (
+                  <div key={device.id} className="motion-enter" style={{ animationDelay: `${120 + index * 70}ms` }}>
+                    <OverviewTeaser device={device} onOpen={() => openHoldingDevice(device.id)} />
+                  </div>
+                ))}
               </div>
             </div>
-          </aside>
-        </>,
-        document.body
-      )
+          </div>
+        </aside>
+      </>,
+      document.body
+    )
     : null;
 
   return (
-    <div className="space-y-4 lg:space-y-5">
+    <div className="space-y-3 sm:space-y-5">
       <section className="dashboard-hero dashboard-hero-compact motion-enter motion-delay-0">
         <div className="dashboard-hero-topline">
           <div className="dashboard-hero-title-block">
@@ -174,7 +210,22 @@ export default function DashboardPage() {
               <div className="dashboard-panel-kicker">Annual Pulse</div>
               <h2 className="dashboard-panel-title">年度购买量</h2>
             </div>
-            <div className="dashboard-panel-meta">按年份查看购买节奏，以及设备分布和等级分布的变化。</div>
+            <div className="annual-mode-switch">
+              <button
+                type="button"
+                className={annualMode === "category" ? "button-primary px-3 py-1.5 text-xs motion-lift" : "button-secondary px-3 py-1.5 text-xs motion-lift"}
+                onClick={() => setAnnualMode("category")}
+              >
+                设备分布
+              </button>
+              <button
+                type="button"
+                className={annualMode === "rating" ? "button-primary px-3 py-1.5 text-xs motion-lift" : "button-secondary px-3 py-1.5 text-xs motion-lift"}
+                onClick={() => setAnnualMode("rating")}
+              >
+                等级分布
+              </button>
+            </div>
           </div>
           <AnnualPurchaseChart
             totals={summary?.purchase_years ?? []}
@@ -215,7 +266,7 @@ export default function DashboardPage() {
           <button
             type="button"
             className="button-secondary motion-lift"
-            onClick={() => navigate("/holding")}
+            onClick={openHoldingDrawer}
             disabled={!currentHoldingDevices.length}
           >
             打开持有设备抽屉
@@ -248,10 +299,11 @@ export default function DashboardPage() {
 
       {holdingDrawer}
 
-      {holdingDetailMatch?.params.deviceId ? (
+      {holdingDetailMatch?.params.deviceId && isHoldingDrawerVisible ? (
         <DeviceDetailDrawer
           deviceId={holdingDetailMatch.params.deviceId}
           closeTo="/holding"
+          closeState={HOLDING_OVERLAY_STATE}
           onChanged={() => {
             loadCurrentHoldingDevices().catch(() => undefined);
             refreshSummary().catch(() => undefined);

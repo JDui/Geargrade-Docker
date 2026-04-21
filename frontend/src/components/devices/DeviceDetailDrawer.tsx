@@ -19,6 +19,7 @@ import {
 interface DeviceDetailDrawerProps {
   deviceId: string;
   closeTo?: string;
+  closeState?: unknown;
   onChanged: () => void;
   fetcher?: (deviceId: string) => Promise<DeviceDetail>;
   deleter?: (deviceId: string) => Promise<void>;
@@ -47,6 +48,7 @@ function saleDateText(device: DeviceDetail) {
 export function DeviceDetailDrawer({
   deviceId,
   closeTo = "/",
+  closeState,
   onChanged,
   fetcher = fetchDevice,
   deleter = deleteDevice,
@@ -58,7 +60,7 @@ export function DeviceDetailDrawer({
   const [device, setDevice] = useState<DeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { isClosing, requestClose } = useAnimatedRouteClose();
+  const { isClosing, isMounted, requestClose } = useAnimatedRouteClose();
 
   useBodyScrollLock(true);
 
@@ -95,7 +97,7 @@ export function DeviceDetailDrawer({
     }
     await deleter(deviceId);
     onChanged();
-    navigate(closeTo);
+    navigate(closeTo, closeState ? { state: closeState } : undefined);
   }
 
   const feeling = device ? isFeelingScore(device.score) : false;
@@ -118,10 +120,10 @@ export function DeviceDetailDrawer({
   }, [device]);
 
   function handleClose() {
-    requestClose(() => navigate(closeTo));
+    requestClose(() => navigate(closeTo, closeState ? { state: closeState } : undefined));
   }
 
-  if (typeof document === "undefined") {
+  if (typeof document === "undefined" || !isMounted) {
     return null;
   }
 
@@ -133,7 +135,7 @@ export function DeviceDetailDrawer({
         onClick={handleClose}
         aria-label="关闭设备详情"
       />
-      <aside className={`drawer-panel drawer-panel-shell ${isClosing ? "motion-slide-out-right" : "motion-slide-in-right"}`}>
+      <aside className={`drawer-panel drawer-panel-shell drawer-panel-wide ${isClosing ? "motion-slide-out-right" : "motion-slide-in-right"}`}>
         <div className="flex h-full min-h-0 flex-col">
           <div className="drawer-header">
             <div className="min-w-0">
@@ -141,8 +143,13 @@ export function DeviceDetailDrawer({
               <h2 className="mt-1 truncate text-xl font-semibold text-textPrimary sm:text-2xl">
                 {device ? formatDeviceTitle(device) : "加载中..."}
               </h2>
+              {device ? (
+                <p className="mt-1 text-sm text-textSecondary">
+                  {device.brand} · {CATEGORY_LABELS[device.category]}
+                </p>
+              ) : null}
             </div>
-            <button type="button" className="button-secondary motion-lift" onClick={handleClose}>
+            <button type="button" className="button-secondary motion-lift shrink-0" onClick={handleClose}>
               关闭
             </button>
           </div>
@@ -152,7 +159,7 @@ export function DeviceDetailDrawer({
             {error ? <div className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-danger">{error}</div> : null}
 
             {!loading && !error && device ? (
-              <div className="space-y-5 sm:space-y-6">
+              <div className="space-y-4">
                 <section className="panel p-4 motion-enter motion-delay-1">
                   {device.image_url ? (
                     <img

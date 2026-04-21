@@ -27,7 +27,7 @@ export function WishlistDetailDrawer({ deviceId, closeTo = "/wishlist", onChange
   const [device, setDevice] = useState<WishlistDeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { isClosing, requestClose } = useAnimatedRouteClose();
+  const { isClosing, isMounted, requestClose } = useAnimatedRouteClose();
 
   useBodyScrollLock(true);
 
@@ -80,7 +80,7 @@ export function WishlistDetailDrawer({ deviceId, closeTo = "/wishlist", onChange
     requestClose(() => navigate(closeTo));
   }
 
-  if (typeof document === "undefined") {
+  if (typeof document === "undefined" || !isMounted) {
     return null;
   }
 

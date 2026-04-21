@@ -17,17 +17,17 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
   }));
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-center">
-      <div className="dashboard-donut-shell motion-enter motion-delay-1">
-        <div className="h-[220px] min-w-0 xl:w-[250px] xl:shrink-0">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="dashboard-donut-shell motion-enter motion-delay-1 shrink-0">
+        <div className="h-[180px] w-full sm:h-[160px] sm:w-[180px]">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 6, right: 6, bottom: 6, left: 6 }}>
+            <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
               <Pie
                 data={chartData}
                 dataKey="count"
                 nameKey="label"
-                innerRadius={54}
-                outerRadius={82}
+                innerRadius={46}
+                outerRadius={72}
                 paddingAngle={3}
                 isAnimationActive
                 animationDuration={1000}
@@ -60,7 +60,7 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
         </div>
       </div>
 
-      <div className="grid min-w-0 flex-1 gap-2">
+      <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
         {chartData.map((item, index) => (
           <div
             key={item.key}
@@ -69,7 +69,7 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
           >
             <span className="dashboard-tag-row-main">
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: palette[index % palette.length] }} />
-              <span className="truncate">{item.label}</span>
+              <span className="truncate text-xs">{item.label}</span>
             </span>
             <span className="dashboard-tag-row-meta">
               <span>{item.count}</span>
