@@ -10,6 +10,7 @@ Thumbs.db
 backend/.venv/
 frontend/node_modules/
 frontend/dist/
+dist/
 
 data/
 backend/data/
