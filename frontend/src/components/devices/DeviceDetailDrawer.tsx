@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { deleteDevice, fetchDevice } from "../../api/devices";
 import { useAnimatedRouteClose } from "../../hooks/useAnimatedRouteClose";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
+import { useAppSettings } from "../layout/AppSettingsProvider";
 import type { DeviceDetail } from "../../types/device";
 import { CATEGORY_LABELS, STATUS_LABELS } from "../../types/device";
 import { formatCurrency, formatDailyCost, formatDate } from "../../utils/format";
@@ -15,6 +16,7 @@ import {
   ratingGlyphText,
   ratingLabelText
 } from "../../utils/device";
+import { CategoryIcon } from "./CategoryIcon";
 
 interface DeviceDetailDrawerProps {
   deviceId: string;
@@ -28,9 +30,9 @@ interface DeviceDetailDrawerProps {
   titleLabel?: string;
 }
 
-function saleDateText(device: DeviceDetail) {
+function saleDateText(device: DeviceDetail, precision: "day" | "month") {
   if (device.sale_date) {
-    return formatDate(device.sale_date);
+    return formatDate(device.sale_date, precision);
   }
 
   switch (device.status) {
@@ -57,6 +59,10 @@ export function DeviceDetailDrawer({
   titleLabel = "设备详情"
 }: DeviceDetailDrawerProps) {
   const navigate = useNavigate();
+  const { defaultIconSize, simplifiedMode } = useAppSettings();
+  const datePrecision: "day" | "month" = simplifiedMode ? "month" : "day";
+  const detailIconFrameClass = defaultIconSize === "small" ? "h-24 w-24" : "h-32 w-32";
+  const detailIconClass = defaultIconSize === "small" ? "h-12 w-12" : "h-16 w-16";
   const [device, setDevice] = useState<DeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,8 +174,10 @@ export function DeviceDetailDrawer({
                       className="mb-4 h-44 w-full rounded-2xl border border-line object-cover sm:h-52"
                     />
                   ) : (
-                    <div className="mb-4 flex h-44 items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt text-textSecondary sm:h-52">
-                      暂无设备图片
+                    <div className="mb-4 flex justify-center">
+                      <div className={`flex ${detailIconFrameClass} items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt text-accent`}>
+                        <CategoryIcon category={device.category} className={detailIconClass} />
+                      </div>
                     </div>
                   )}
 
@@ -259,11 +267,11 @@ export function DeviceDetailDrawer({
                     </div>
                     <div className="drawer-info-card">
                       <div className="drawer-info-label">购入日期</div>
-                      <div className="drawer-info-value">{formatDate(device.purchase_date)}</div>
+                      <div className="drawer-info-value">{formatDate(device.purchase_date, datePrecision)}</div>
                     </div>
                     <div className="drawer-info-card">
                       <div className="drawer-info-label">售出日期</div>
-                      <div className="drawer-info-value">{saleDateText(device)}</div>
+                      <div className="drawer-info-value">{saleDateText(device, datePrecision)}</div>
                     </div>
                     <div className="drawer-info-card sm:col-span-2">
                       <div className="drawer-info-label">每日成本</div>

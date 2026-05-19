@@ -7,7 +7,9 @@ import {
   fetchScoreLeaderboard
 } from "../api/leaderboards";
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
+import { useAppSettings } from "../components/layout/AppSettingsProvider";
 import {
+  type DurationUnit,
   type FinanceLeaderboardItem,
   type HoldingDurationItem,
   type LeaderboardTab,
@@ -15,7 +17,7 @@ import {
   type SortOrder
 } from "../types/device";
 import { ratingLabelText } from "../utils/device";
-import { formatCurrency, formatDailyCost, formatDate, formatDurationDays } from "../utils/format";
+import { formatCurrency, formatDailyCost, formatDate, formatDurationDays, formatDurationMonths } from "../utils/format";
 
 type RankedEntry = {
   rank: number;
@@ -39,16 +41,18 @@ function tabLabel(tab: LeaderboardTab) {
 
 function normalizeEntries(
   tab: LeaderboardTab,
-  items: HoldingDurationItem[] | ScoreLeaderboardItem[] | FinanceLeaderboardItem[]
+  items: HoldingDurationItem[] | ScoreLeaderboardItem[] | FinanceLeaderboardItem[],
+  durationUnit: DurationUnit
 ): RankedEntry[] {
   if (tab === "holding-duration") {
+    const datePrecision: "day" | "month" = durationUnit === "months" ? "month" : "day";
     return (items as HoldingDurationItem[]).map((item) => ({
       rank: item.rank,
       deviceId: item.device_id,
       name: item.name,
       brand: item.brand,
-      headline: formatDurationDays(item.duration_days),
-      meta: `${formatDate(item.purchase_date)} 至 ${item.sale_date ? formatDate(item.sale_date) : "现在"} · ${formatDailyCost(item.daily_cost_value)}`
+      headline: durationUnit === "months" ? formatDurationMonths(item.duration_months) : formatDurationDays(item.duration_days),
+      meta: `${formatDate(item.purchase_date, datePrecision)} 至 ${item.sale_date ? formatDate(item.sale_date, datePrecision) : "现在"} · ${formatDailyCost(item.daily_cost_value)}`
     }));
   }
 
@@ -154,7 +158,9 @@ function LeaderboardList({
 export default function LeaderboardsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { simplifiedMode } = useAppSettings();
   const drawerMatch = useMatch("/leaderboards/devices/:deviceId");
+  const durationUnit: DurationUnit = simplifiedMode ? "months" : "days";
 
   const rawTab = searchParams.get("tab");
   const rawSort = searchParams.get("sort_order");
@@ -194,13 +200,13 @@ export default function LeaderboardsPage() {
 
     const loader =
       tab === "holding-duration"
-        ? fetchHoldingDurationLeaderboard(sortOrder).then((result) => setHoldingItems(result.items))
+        ? fetchHoldingDurationLeaderboard(sortOrder, durationUnit).then((result) => setHoldingItems(result.items))
         : tab === "score"
           ? fetchScoreLeaderboard(sortOrder).then((result) => setScoreItems(result.items))
           : fetchFinanceLeaderboard(sortOrder).then((result) => setFinanceItems(result.items));
 
     loader.catch((err: Error) => setError(err.message));
-  }, [tab, sortOrder, refreshToken]);
+  }, [durationUnit, tab, sortOrder, refreshToken]);
 
   const activeItems =
     tab === "holding-duration"
@@ -209,7 +215,7 @@ export default function LeaderboardsPage() {
         ? scoreItems
         : financeItems;
 
-  const entries = normalizeEntries(tab, activeItems);
+  const entries = normalizeEntries(tab, activeItems, durationUnit);
   const podiumEntries = entries.slice(0, 3);
   const restEntries = entries.slice(3);
   const currentSearch = searchParams.toString();

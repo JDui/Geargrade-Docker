@@ -1,8 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 
+import { useAppSettings } from "../layout/AppSettingsProvider";
 import { CATEGORY_LABELS, STATUS_LABELS, type DeviceListItem } from "../../types/device";
 import { formatCurrency, formatDailyCost, formatDate } from "../../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../../utils/device";
+import { CategoryIconFallback } from "./CategoryIcon";
 
 function statusClass(status: DeviceListItem["status"]) {
   const palette: Record<DeviceListItem["status"], string> = {
@@ -24,17 +26,6 @@ function ratingClass(rating: NonNullable<DeviceListItem["rating_label"]>) {
   return palette[rating];
 }
 
-function ImageFallback({ device }: { device: DeviceListItem }) {
-  return (
-    <div className="flex h-24 w-28 shrink-0 items-center justify-center rounded-xl border border-line bg-panelAlt">
-      <div className="text-center">
-        <div className="text-lg font-semibold text-accent">{device.brand.slice(0, 1)}</div>
-        <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">No Image</div>
-      </div>
-    </div>
-  );
-}
-
 interface DeviceCardProps {
   device: DeviceListItem;
   detailBasePath?: string;
@@ -47,6 +38,7 @@ export function DeviceCard({
   editBasePath = "/devices"
 }: DeviceCardProps) {
   const navigate = useNavigate();
+  const { defaultIconSize, simplifiedMode } = useAppSettings();
   const feeling = isFeelingScore(device.score);
   const unrated = isUnratedScore(device.score);
 
@@ -61,7 +53,7 @@ export function DeviceCard({
           {device.image_url ? (
             <img src={device.image_url} alt={device.name} className="h-24 w-28 rounded-xl border border-line object-cover" />
           ) : (
-            <ImageFallback device={device} />
+            <CategoryIconFallback category={device.category} size={defaultIconSize} />
           )}
 
           <div className="min-w-0 flex-1">
@@ -112,7 +104,7 @@ export function DeviceCard({
           </div>
           <div className="rounded-xl bg-panelAlt px-3 py-2">
             <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">购入日期</div>
-            <div className="mt-1 text-sm font-medium text-textPrimary">{formatDate(device.purchase_date)}</div>
+            <div className="mt-1 text-sm font-medium text-textPrimary">{formatDate(device.purchase_date, simplifiedMode ? "month" : "day")}</div>
           </div>
           <div className="rounded-xl bg-panelAlt px-3 py-2">
             <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">每日成本</div>

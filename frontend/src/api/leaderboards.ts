@@ -1,13 +1,19 @@
 import { apiGet } from "./client";
 import type {
+  DurationUnit,
   FinanceLeaderboardResponse,
   HoldingDurationResponse,
   SortOrder,
   ScoreLeaderboardResponse
 } from "../types/device";
 
-export function fetchHoldingDurationLeaderboard(sortOrder: SortOrder): Promise<HoldingDurationResponse> {
-  return apiGet<HoldingDurationResponse>(`/api/v1/leaderboards/holding-duration?sort_order=${sortOrder}`);
+export function fetchHoldingDurationLeaderboard(
+  sortOrder: SortOrder,
+  durationUnit: DurationUnit = "days"
+): Promise<HoldingDurationResponse> {
+  return apiGet<HoldingDurationResponse>(
+    `/api/v1/leaderboards/holding-duration?sort_order=${sortOrder}&duration_unit=${durationUnit}`
+  );
 }
 
 export function fetchScoreLeaderboard(sortOrder: SortOrder): Promise<ScoreLeaderboardResponse> {

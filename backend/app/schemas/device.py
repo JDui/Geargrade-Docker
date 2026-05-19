@@ -31,6 +31,19 @@ def _normalize_string_list(value: object) -> list[str]:
     raise ValueError("Expected a list of strings.")
 
 
+def _normalize_optional_scalar(value: object) -> object:
+    if isinstance(value, str):
+        value = value.strip()
+        return value or None
+    return value
+
+
+def _normalize_required_string(value: object) -> object:
+    if isinstance(value, str):
+        return value.strip()
+    return value
+
+
 class DeviceBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     brand: str = Field(min_length=1, max_length=255)
@@ -59,8 +72,16 @@ class DeviceBase(BaseModel):
         return _normalize_string_list(value)
 
     @field_validator(
+        "name",
+        "brand",
+        mode="before",
+    )
+    @classmethod
+    def normalize_required_strings(cls, value: object) -> object:
+        return _normalize_required_string(value)
+
+    @field_validator(
         "mount_system_custom",
-        "review_detail",
         "image_original_url",
         "image_storage_path",
         "image_storage_name",
@@ -68,10 +89,30 @@ class DeviceBase(BaseModel):
     )
     @classmethod
     def normalize_optional_strings(cls, value: object) -> object:
+        return _normalize_optional_scalar(value)
+
+    @field_validator(
+        "review_detail",
+        mode="before",
+    )
+    @classmethod
+    def normalize_review_detail(cls, value: object) -> object:
         if isinstance(value, str):
-            value = value.strip()
-            return value or None
+            return value.strip()
         return value
+
+    @field_validator(
+        "purchase_price",
+        "sale_price",
+        "purchase_date",
+        "sale_date",
+        "mount_system_key",
+        "image_source_type",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_fields(cls, value: object) -> object:
+        return _normalize_optional_scalar(value)
 
 
 class DeviceCreate(DeviceBase):
@@ -106,6 +147,49 @@ class DeviceUpdate(BaseModel):
         if value is None:
             return None
         return _normalize_string_list(value)
+
+    @field_validator(
+        "name",
+        "brand",
+        mode="before",
+    )
+    @classmethod
+    def normalize_required_strings(cls, value: object) -> object:
+        return _normalize_required_string(value)
+
+    @field_validator(
+        "mount_system_custom",
+        "image_original_url",
+        "image_storage_path",
+        "image_storage_name",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_strings(cls, value: object) -> object:
+        return _normalize_optional_scalar(value)
+
+    @field_validator(
+        "review_detail",
+        mode="before",
+    )
+    @classmethod
+    def normalize_review_detail(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        return value
+
+    @field_validator(
+        "purchase_price",
+        "sale_price",
+        "purchase_date",
+        "sale_date",
+        "mount_system_key",
+        "image_source_type",
+        mode="before",
+    )
+    @classmethod
+    def normalize_optional_fields(cls, value: object) -> object:
+        return _normalize_optional_scalar(value)
 
 
 class DeviceListItem(BaseModel):

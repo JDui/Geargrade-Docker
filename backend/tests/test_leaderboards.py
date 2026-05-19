@@ -65,8 +65,50 @@ def test_leaderboards(session):
 
     assert holding_desc.items[0].name == "Hold Long"
     assert holding_asc.items[0].name == "Sold Profit"
+    assert next(item for item in holding_desc.items if item.name == "Sold Profit").duration_months == 2
     assert all(item.name != "Feeling Device" for item in score.items)
     assert finance.items[0].profit_value == 600
+
+
+def test_holding_duration_leaderboard_can_sort_by_calendar_months(session):
+    settings = Settings(media_root="data/media")
+    create_device(
+        session,
+        DeviceCreate(
+            name="Month One Long Days",
+            brand="Alpha",
+            category=DeviceCategory.CAMERA_BODY,
+            status=DeviceStatus.SOLD,
+            score=80,
+            acquisition_iteration=1,
+            review_detail="long days",
+            purchase_date="2025-01-01",
+            sale_date="2025-02-28",
+        ),
+        settings,
+    )
+    create_device(
+        session,
+        DeviceCreate(
+            name="Month Two Short Days",
+            brand="Beta",
+            category=DeviceCategory.LENS,
+            status=DeviceStatus.SOLD,
+            score=80,
+            acquisition_iteration=1,
+            review_detail="short days",
+            purchase_date="2025-01-31",
+            sale_date="2025-03-01",
+        ),
+        settings,
+    )
+
+    by_days = get_holding_duration_leaderboard(session, sort_order="desc")
+    by_months = get_holding_duration_leaderboard(session, sort_order="desc", duration_unit="months")
+
+    assert by_days.items[0].name == "Month One Long Days"
+    assert by_months.items[0].name == "Month Two Short Days"
+    assert by_months.items[0].duration_months == 2
 
 
 def test_dashboard_purchase_years_excludes_accessories(session):

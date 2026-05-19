@@ -2,9 +2,11 @@ import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "../components/layout/AppShell";
 import ArchivePage from "../pages/ArchivePage";
+import DataToolsPage from "../pages/DataToolsPage";
 import DashboardPage from "../pages/DashboardPage";
 import DeviceFormPage from "../pages/DeviceFormPage";
 import LeaderboardsPage from "../pages/LeaderboardsPage";
+import SettingsPage from "../pages/SettingsPage";
 import WishlistPage from "../pages/WishlistPage";
 
 function OverviewLayout() {
@@ -66,7 +68,8 @@ export function AppRouter() {
         <Route path="/wishlist/new" element={<DeviceFormPage mode="create" resource="wishlist" />} />
         <Route path="/wishlist/:deviceId/edit" element={<DeviceFormPage mode="edit" resource="wishlist" />} />
         <Route path="/wishlist/devices/:deviceId/redeem" element={<DeviceFormPage mode="redeem" resource="devices" />} />
-        <Route path="/data-tools" element={<Navigate to="/devices/new#data-tools" replace />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/data-tools" element={<DataToolsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

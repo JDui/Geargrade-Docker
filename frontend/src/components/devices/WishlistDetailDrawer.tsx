@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { deleteWishlistDevice, fetchWishlistDevice } from "../../api/wishlist";
 import { useAnimatedRouteClose } from "../../hooks/useAnimatedRouteClose";
 import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
+import { useAppSettings } from "../layout/AppSettingsProvider";
 import type { WishlistDeviceDetail } from "../../types/device";
 import { CATEGORY_LABELS } from "../../types/device";
 import { formatDateTime } from "../../utils/format";
@@ -15,6 +16,7 @@ import {
   ratingGlyphText,
   ratingLabelText
 } from "../../utils/device";
+import { CategoryIcon } from "./CategoryIcon";
 
 interface WishlistDetailDrawerProps {
   deviceId: string;
@@ -24,6 +26,9 @@ interface WishlistDetailDrawerProps {
 
 export function WishlistDetailDrawer({ deviceId, closeTo = "/wishlist", onChanged }: WishlistDetailDrawerProps) {
   const navigate = useNavigate();
+  const { defaultIconSize } = useAppSettings();
+  const detailIconFrameClass = defaultIconSize === "small" ? "h-24 w-24" : "h-32 w-32";
+  const detailIconClass = defaultIconSize === "small" ? "h-12 w-12" : "h-16 w-16";
   const [device, setDevice] = useState<WishlistDeviceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,8 +125,10 @@ export function WishlistDetailDrawer({ deviceId, closeTo = "/wishlist", onChange
                       className="mb-4 h-44 w-full rounded-2xl border border-line object-cover sm:h-52"
                     />
                   ) : (
-                    <div className="mb-4 flex h-44 items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt text-textSecondary sm:h-52">
-                      暂无设备图片
+                    <div className="mb-4 flex justify-center">
+                      <div className={`flex ${detailIconFrameClass} items-center justify-center rounded-2xl border border-dashed border-line bg-panelAlt text-accent`}>
+                        <CategoryIcon category={device.category} className={detailIconClass} />
+                      </div>
                     </div>
                   )}
 

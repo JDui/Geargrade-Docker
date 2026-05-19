@@ -11,6 +11,7 @@ import {
   type PurchaseYearBucket,
   type RatingLabel
 } from "../../types/device";
+import { useAppSettings } from "../layout/AppSettingsProvider";
 
 interface AnnualPurchaseChartProps {
   totals: PurchaseYearBucket[];
@@ -66,6 +67,7 @@ export function AnnualPurchaseChart({
   mode,
   onModeChange
 }: AnnualPurchaseChartProps) {
+  const { reduceMotion } = useAppSettings();
   const chartConfig = useMemo(() => {
     if (mode === "category") {
       const categoryMap = toBreakdownMap(categoryBreakdown);
@@ -125,7 +127,7 @@ export function AnnualPurchaseChart({
                 fill={chartConfig.palette[key as keyof typeof chartConfig.palette] as string}
                 radius={[0, 0, 0, 0]}
                 maxBarSize={38}
-                isAnimationActive
+                isAnimationActive={!reduceMotion}
                 animationDuration={1100}
                 animationEasing="ease-out"
               >

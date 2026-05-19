@@ -38,9 +38,28 @@ interface DeviceFormProps {
   onSubmit: (payload: DevicePayload) => Promise<void>;
   submitting: boolean;
   submitLabel?: string;
+  simplifiedMode?: boolean;
 }
 
-function defaultValues(defaultDevice?: DeviceDetail): DeviceFormValues {
+function toDateInputValue(value: string | null | undefined, simplifiedMode: boolean) {
+  if (!value) {
+    return "";
+  }
+  if (!simplifiedMode) {
+    return value;
+  }
+  const match = value.match(/^(\d{4}-\d{2})/);
+  return match ? match[1] : value;
+}
+
+function toPayloadDate(value: string, simplifiedMode: boolean) {
+  if (!value) {
+    return null;
+  }
+  return simplifiedMode && /^\d{4}-\d{2}$/.test(value) ? `${value}-01` : value;
+}
+
+function defaultValues(defaultDevice: DeviceDetail | undefined, simplifiedMode: boolean): DeviceFormValues {
   const iteration = defaultDevice?.acquisition_iteration ?? 1;
   return {
     name: defaultDevice?.name ?? "",
@@ -58,8 +77,8 @@ function defaultValues(defaultDevice?: DeviceDetail): DeviceFormValues {
     cons: defaultDevice?.cons ?? [],
     purchase_price: defaultDevice?.purchase_price != null ? String(defaultDevice.purchase_price) : "",
     sale_price: defaultDevice?.sale_price != null ? String(defaultDevice.sale_price) : "",
-    purchase_date: defaultDevice?.purchase_date ?? "",
-    sale_date: defaultDevice?.sale_date ?? ""
+    purchase_date: toDateInputValue(defaultDevice?.purchase_date, simplifiedMode),
+    sale_date: toDateInputValue(defaultDevice?.sale_date, simplifiedMode)
   };
 }
 
@@ -72,17 +91,18 @@ export function DeviceForm({
   onUploadChange,
   onSubmit,
   submitting,
-  submitLabel
+  submitLabel,
+  simplifiedMode = false
 }: DeviceFormProps) {
   const { register, handleSubmit, control, formState, reset, watch } = useForm<DeviceFormValues>({
-    defaultValues: defaultValues(defaultDevice)
+    defaultValues: defaultValues(defaultDevice, simplifiedMode)
   });
   const [selectedUploadName, setSelectedUploadName] = useState("");
   const [pasteHint, setPasteHint] = useState("");
 
   useEffect(() => {
-    reset(defaultValues(defaultDevice));
-  }, [defaultDevice, reset]);
+    reset(defaultValues(defaultDevice, simplifiedMode));
+  }, [defaultDevice, reset, simplifiedMode]);
 
   const scoreValue = Math.trunc(Number(watch("score") || 0));
   const status = watch("status");
@@ -122,7 +142,7 @@ export function DeviceForm({
       : Math.max(2, Number(values.acquisition_iteration_value || "2"));
 
     let salePrice: number | null = values.sale_price ? Number(values.sale_price) : null;
-    let saleDate: string | null = values.sale_date || null;
+    let saleDate: string | null = toPayloadDate(values.sale_date, simplifiedMode);
 
     if (values.status === "holding" || values.status === "for_sale") {
       salePrice = null;
@@ -147,7 +167,7 @@ export function DeviceForm({
       cons: values.cons,
       purchase_price: values.purchase_price ? Number(values.purchase_price) : null,
       sale_price: salePrice,
-      purchase_date: values.purchase_date || null,
+      purchase_date: toPayloadDate(values.purchase_date, simplifiedMode),
       sale_date: saleDate,
       image_source_type: defaultDevice?.image_source_type ?? null,
       image_original_url: defaultDevice?.image_original_url ?? null,
@@ -308,18 +328,19 @@ export function DeviceForm({
 
           <div>
             <label className="field-label">购入日期</label>
-            <input aria-label="购入日期" className="input" type="date" {...register("purchase_date")} />
+            <input aria-label="购入日期" className="input" type={simplifiedMode ? "month" : "date"} {...register("purchase_date")} />
           </div>
 
           {!saleFieldsDisabled && !isBroken ? (
             <div>
               <label className="field-label">售出日期</label>
-              <input aria-label="售出日期" className="input" type="date" {...register("sale_date")} />
+              <input aria-label="售出日期" className="input" type={simplifiedMode ? "month" : "date"} {...register("sale_date")} />
             </div>
           ) : null}
         </div>
       </section>
 
+      {!simplifiedMode ? (
       <section className="panel p-5">
         <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">设备图片</div>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -362,6 +383,7 @@ export function DeviceForm({
           </div>
         ) : null}
       </section>
+      ) : null}
 
       <div className="flex justify-end">
         <button className="button-primary min-w-36" type="submit" disabled={submitting}>

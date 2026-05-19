@@ -1,8 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 
+import { useAppSettings } from "../layout/AppSettingsProvider";
 import { CATEGORY_LABELS, type WishlistDeviceListItem } from "../../types/device";
 import { formatDateTime } from "../../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../../utils/device";
+import { CategoryIconFallback } from "./CategoryIcon";
 
 function ratingClass(rating: NonNullable<WishlistDeviceListItem["rating_label"]>) {
   const palette: Record<NonNullable<WishlistDeviceListItem["rating_label"]>, string> = {
@@ -14,23 +16,13 @@ function ratingClass(rating: NonNullable<WishlistDeviceListItem["rating_label"]>
   return palette[rating];
 }
 
-function ImageFallback({ device }: { device: WishlistDeviceListItem }) {
-  return (
-    <div className="flex h-24 w-28 shrink-0 items-center justify-center rounded-xl border border-line bg-panelAlt">
-      <div className="text-center">
-        <div className="text-lg font-semibold text-accent">{device.brand.slice(0, 1)}</div>
-        <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">No Image</div>
-      </div>
-    </div>
-  );
-}
-
 interface WishlistCardProps {
   device: WishlistDeviceListItem;
 }
 
 export function WishlistCard({ device }: WishlistCardProps) {
   const navigate = useNavigate();
+  const { defaultIconSize } = useAppSettings();
   const feeling = isFeelingScore(device.score);
   const unrated = isUnratedScore(device.score);
 
@@ -45,7 +37,7 @@ export function WishlistCard({ device }: WishlistCardProps) {
           {device.image_url ? (
             <img src={device.image_url} alt={device.name} className="h-24 w-28 rounded-xl border border-line object-cover" />
           ) : (
-            <ImageFallback device={device} />
+            <CategoryIconFallback category={device.category} size={defaultIconSize} />
           )}
 
           <div className="min-w-0 flex-1">

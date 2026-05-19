@@ -2,6 +2,7 @@ import "@testing-library/jest-dom";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
+import { AppSettingsProvider } from "../components/layout/AppSettingsProvider";
 import { DashboardSummaryProvider } from "../components/layout/DashboardSummaryProvider";
 import { ThemeProvider } from "../components/layout/ThemeProvider";
 import { AppRouter } from "./AppRouter";
@@ -24,6 +25,14 @@ describe("AppRouter", () => {
   beforeAll(() => {
     Object.defineProperty(globalThis, "ResizeObserver", {
       value: ResizeObserverMock,
+      configurable: true
+    });
+    Object.defineProperty(window, "matchMedia", {
+      value: vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn()
+      })),
       configurable: true
     });
   });
@@ -122,16 +131,56 @@ describe("AppRouter", () => {
 
     render(
       <ThemeProvider>
-        <DashboardSummaryProvider>
-          <MemoryRouter initialEntries={["/devices/42"]}>
-            <AppRouter />
-          </MemoryRouter>
-        </DashboardSummaryProvider>
+        <AppSettingsProvider>
+          <DashboardSummaryProvider>
+            <MemoryRouter initialEntries={["/devices/42"]}>
+              <AppRouter />
+            </MemoryRouter>
+          </DashboardSummaryProvider>
+        </AppSettingsProvider>
       </ThemeProvider>
     );
 
     await waitFor(() => {
       expect(screen.getByText("设备详情")).toBeInTheDocument();
     });
+  });
+
+  it("renders data tools page at /data-tools", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              currently_owned_count: 0,
+              sold_count: 0,
+              feeling_in_progress_count: 0,
+              ratings: [],
+              purchase_years: [],
+              purchase_year_category_breakdown: [],
+              purchase_year_rating_breakdown: [],
+              categories: []
+            })
+          )
+        )
+      )
+    );
+
+    render(
+      <ThemeProvider>
+        <AppSettingsProvider>
+          <DashboardSummaryProvider>
+            <MemoryRouter initialEntries={["/data-tools"]}>
+              <AppRouter />
+            </MemoryRouter>
+          </DashboardSummaryProvider>
+        </AppSettingsProvider>
+      </ThemeProvider>
+    );
+
+    expect(await screen.findByRole("button", { name: "主库" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "心愿池" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重置" })).toBeInTheDocument();
   });
 });

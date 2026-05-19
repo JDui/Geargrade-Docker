@@ -3,7 +3,11 @@ import type {
   DataExportResponse,
   DataImportResponse,
   DataResetResponse,
-  DevicePayload
+  GGPack,
+  GGPackImportRequest,
+  GGPackImportResponse,
+  GGPackPreviewResponse,
+  GGPackScope
 } from "../types/device";
 
 
@@ -12,8 +16,23 @@ export function exportData(): Promise<DataExportResponse> {
 }
 
 
-export function importData(items: DevicePayload[]): Promise<DataImportResponse> {
-  return apiPost<DataImportResponse>("/api/v1/data/import", { items });
+export function importData(payload: unknown): Promise<DataImportResponse> {
+  return apiPost<DataImportResponse>("/api/v1/data/import", payload);
+}
+
+
+export function exportGGPack(scope: GGPackScope): Promise<GGPack> {
+  return apiGet<GGPack>(`/api/v1/data/ggpack/export?scope=${scope}`);
+}
+
+
+export function previewGGPack(payload: GGPack): Promise<GGPackPreviewResponse> {
+  return apiPost<GGPackPreviewResponse>("/api/v1/data/ggpack/preview", payload);
+}
+
+
+export function importGGPack(payload: GGPackImportRequest): Promise<GGPackImportResponse> {
+  return apiPost<GGPackImportResponse>("/api/v1/data/ggpack/import", payload);
 }
 
 

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { PageTransition, isDrawerRoute, pageKey } from "./PageTransition";
+import { useAppSettings } from "./AppSettingsProvider";
 import { useDashboardSummary } from "./DashboardSummaryProvider";
 import { useTheme } from "./ThemeProvider";
 
@@ -31,26 +32,31 @@ function SummaryBadge({
 
 export function AppShell() {
   const { theme, toggleTheme } = useTheme();
+  const { contentWidth, reduceMotion, showBackgroundGrid } = useAppSettings();
   const { summary } = useDashboardSummary();
   const location = useLocation();
   const previousPageKey = useRef(pageKey(location.pathname));
+  const widthClass = {
+    compact: "max-w-5xl",
+    default: "max-w-7xl",
+    wide: "max-w-screen-2xl"
+  }[contentWidth];
 
   useEffect(() => {
     const nextPageKey = pageKey(location.pathname);
     const wasDrawer = isDrawerRoute(location.pathname);
 
     if (nextPageKey !== previousPageKey.current && !wasDrawer) {
-      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      window.scrollTo({ top: 0, behavior: prefersReducedMotion ? "auto" : "smooth" });
+      window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
     }
 
     previousPageKey.current = nextPageKey;
-  }, [location.pathname]);
+  }, [location.pathname, reduceMotion]);
 
   return (
-    <div className="min-h-screen bg-grid bg-[size:18px_18px]">
+    <div className={showBackgroundGrid ? "min-h-screen bg-grid bg-[size:18px_18px]" : "min-h-screen"}>
       <header className="sticky top-0 z-40 border-b border-line/80 bg-surface/92 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2.5 px-3 py-2.5 sm:px-6 sm:py-4 lg:px-8">
+        <div className={`mx-auto flex ${widthClass} flex-col gap-2.5 px-3 py-2.5 sm:px-6 sm:py-4 lg:px-8`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 motion-enter motion-delay-0">
               <div className="text-[10px] uppercase tracking-[0.3em] text-accent/80 sm:text-xs">Geargrade</div>
@@ -88,11 +94,17 @@ export function AppShell() {
             <NavLink to="/devices/new" className={navClassName}>
               新增设备
             </NavLink>
+            <NavLink to="/data-tools" className={navClassName}>
+              数据工具
+            </NavLink>
+            <NavLink to="/settings" className={navClassName}>
+              设置
+            </NavLink>
           </nav>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
+      <main className={`mx-auto ${widthClass} px-3 py-4 sm:px-6 sm:py-6 lg:px-8`}>
         <PageTransition />
       </main>
     </div>

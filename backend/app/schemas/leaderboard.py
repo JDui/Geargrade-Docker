@@ -15,6 +15,7 @@ class LeaderboardBaseItem(BaseModel):
 
 class HoldingDurationItem(LeaderboardBaseItem):
     duration_days: int
+    duration_months: int
     purchase_date: str | None
     sale_date: str | None
 

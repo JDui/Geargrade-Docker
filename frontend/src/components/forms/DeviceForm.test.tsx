@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { DeviceForm } from "./DeviceForm";
 
@@ -59,5 +59,31 @@ describe("DeviceForm", () => {
     fireEvent.paste(pasteTarget, { clipboardData });
 
     expect(onUploadChange).toHaveBeenCalledWith(expect.any(File));
+  });
+
+  it("converts month input to first day in simplified mode", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <DeviceForm
+        imageMode="none"
+        remoteUrl=""
+        onImageModeChange={() => undefined}
+        onRemoteUrlChange={() => undefined}
+        onUploadChange={() => undefined}
+        onSubmit={onSubmit}
+        submitting={false}
+        simplifiedMode={true}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("名称"), { target: { value: "Sony A7C II" } });
+    fireEvent.change(screen.getByLabelText("品牌"), { target: { value: "Sony" } });
+    fireEvent.change(screen.getByLabelText("购入日期"), { target: { value: "2024-03" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建设备" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ purchase_date: "2024-03-01" }));
+    });
   });
 });

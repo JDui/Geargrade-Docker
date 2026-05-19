@@ -7,6 +7,7 @@ import { AnnualPurchaseChart } from "../components/dashboard/AnnualPurchaseChart
 import { CategoryDonutChart } from "../components/dashboard/CategoryDonutChart";
 import { RatingBarChart } from "../components/dashboard/RatingBarChart";
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
+import { useAppSettings } from "../components/layout/AppSettingsProvider";
 import { useDashboardSummary } from "../components/layout/DashboardSummaryProvider";
 import { useAnimatedRouteClose } from "../hooks/useAnimatedRouteClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
@@ -32,6 +33,7 @@ type OverlayRouteState = {
 };
 
 function OverviewTeaser({ device, onOpen }: { device: DeviceListItem; onOpen: () => void }) {
+  const { simplifiedMode } = useAppSettings();
   const feeling = isFeelingScore(device.score);
   const unrated = isUnratedScore(device.score);
 
@@ -50,7 +52,7 @@ function OverviewTeaser({ device, onOpen }: { device: DeviceListItem; onOpen: ()
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <div>
           <div className="overview-teaser-label">购入日期</div>
-          <div className="overview-teaser-value">{formatDate(device.purchase_date)}</div>
+          <div className="overview-teaser-value">{formatDate(device.purchase_date, simplifiedMode ? "month" : "day")}</div>
         </div>
         <div>
           <div className="overview-teaser-label">评分</div>

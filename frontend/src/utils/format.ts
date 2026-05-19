@@ -24,7 +24,7 @@ export function formatDailyCost(value: number | null | undefined): string {
   return `${prefix}${amount}/天`;
 }
 
-export function formatDate(value: string | null | undefined): string {
+export function formatDate(value: string | null | undefined, precision: "day" | "month" = "day"): string {
   if (!value) {
     return "未记录";
   }
@@ -34,11 +34,15 @@ export function formatDate(value: string | null | undefined): string {
     return value;
   }
 
-  return new Intl.DateTimeFormat("zh-CN", {
+  const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(date);
+    month: "2-digit"
+  };
+  if (precision === "day") {
+    options.day = "2-digit";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", options).format(date);
 }
 
 export function formatDateTime(value: string | null | undefined): string {
@@ -68,4 +72,8 @@ export function formatDurationDays(days: number): string {
     return `${(days / 30).toFixed(1)} 个月`;
   }
   return `${(days / 365).toFixed(1)} 年`;
+}
+
+export function formatDurationMonths(months: number): string {
+  return `${months} 个月`;
 }

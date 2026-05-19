@@ -11,8 +11,8 @@ import {
 } from "../api/wishlist";
 import { DeviceForm, type ImageMode } from "../components/forms/DeviceForm";
 import { WishlistForm } from "../components/forms/WishlistForm";
+import { useAppSettings } from "../components/layout/AppSettingsProvider";
 import { useDashboardSummary } from "../components/layout/DashboardSummaryProvider";
-import { DataToolsSection } from "../components/tools/DataToolsSection";
 import type {
   DeviceDetail,
   DevicePayload,
@@ -42,6 +42,7 @@ function mapWishlistToDeviceDetail(device: WishlistDeviceDetail): DeviceDetail {
 export default function DeviceFormPage({ mode, resource = "devices" }: DeviceFormPageProps) {
   const { deviceId } = useParams();
   const navigate = useNavigate();
+  const { simplifiedMode } = useAppSettings();
   const { refreshSummary } = useDashboardSummary();
   const [device, setDevice] = useState<DeviceDetail | undefined>(undefined);
   const [wishlistDevice, setWishlistDevice] = useState<WishlistDeviceDetail | undefined>(undefined);
@@ -265,6 +266,7 @@ export default function DeviceFormPage({ mode, resource = "devices" }: DeviceFor
               onUploadChange={setUploadFile}
               onSubmit={handleWishlistSubmit}
               submitting={submitting}
+              simplifiedMode={simplifiedMode}
             />
           ) : (
             <DeviceForm
@@ -277,10 +279,10 @@ export default function DeviceFormPage({ mode, resource = "devices" }: DeviceFor
               onSubmit={handleDeviceSubmit}
               submitting={submitting}
               submitLabel={isRedeem ? "完成兑现" : undefined}
+              simplifiedMode={simplifiedMode}
             />
           )}
 
-          {!isWishlist && !isRedeem && mode === "create" ? <DataToolsSection /> : null}
         </>
       ) : null}
     </div>

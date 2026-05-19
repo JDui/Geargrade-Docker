@@ -9,6 +9,7 @@ from app.schemas.leaderboard import (
     ScoreLeaderboardResponse,
 )
 from app.services.leaderboard_service import (
+    DurationUnit,
     get_finance_leaderboard,
     get_holding_duration_leaderboard,
     get_score_leaderboard,
@@ -21,9 +22,10 @@ router = APIRouter(prefix="/leaderboards", tags=["leaderboards"])
 @router.get("/holding-duration", response_model=HoldingDurationResponse)
 def holding_duration_leaderboard(
     sort_order: SortOrder = Query(default="desc"),
+    duration_unit: DurationUnit = Query(default="days"),
     db: Session = Depends(get_db),
 ) -> HoldingDurationResponse:
-    return get_holding_duration_leaderboard(db, sort_order=sort_order)
+    return get_holding_duration_leaderboard(db, sort_order=sort_order, duration_unit=duration_unit)
 
 
 @router.get("/score", response_model=ScoreLeaderboardResponse)

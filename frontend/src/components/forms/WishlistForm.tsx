@@ -30,6 +30,7 @@ interface WishlistFormProps {
   onUploadChange: (file: File | null) => void;
   onSubmit: (payload: WishlistDevicePayload) => Promise<void>;
   submitting: boolean;
+  simplifiedMode?: boolean;
 }
 
 function defaultValues(defaultDevice?: WishlistDeviceDetail): WishlistFormValues {
@@ -56,7 +57,8 @@ export function WishlistForm({
   onRemoteUrlChange,
   onUploadChange,
   onSubmit,
-  submitting
+  submitting,
+  simplifiedMode = false
 }: WishlistFormProps) {
   const { register, handleSubmit, control, formState, reset, watch } = useForm<WishlistFormValues>({
     defaultValues: defaultValues(defaultDevice)
@@ -225,6 +227,7 @@ export function WishlistForm({
         </div>
       </section>
 
+      {!simplifiedMode ? (
       <section className="space-y-4 rounded-3xl border border-line bg-panelAlt/60 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -283,6 +286,7 @@ export function WishlistForm({
           </label>
         )}
       </section>
+      ) : null}
 
       <div className="flex flex-wrap justify-end gap-3">
         <button type="submit" className="button-primary" disabled={submitting}>

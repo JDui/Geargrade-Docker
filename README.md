@@ -74,7 +74,7 @@ Geargrade 是一个面向个人摄影器材管理的自托管 Web 应用。它�
 
 ### 数据工具
 
-数据工具已经并入“新增设备”页底部，用于导入主设备库 JSON、导出当前主设备库，以及执行高危数据重置。
+数据工具位于独立 `/data-tools` 页面，用于通过 GGPack 表格包导入导出主设备库与心愿池，以及执行高危数据重置。
 
 ![数据工具](docs/screenshots/data-tools.png)
 
@@ -208,14 +208,15 @@ ARM 镜像标签改为 `geargrade:v0.4-arm64`。
 - 心愿池不会进入首页 Dashboard 统计
 - 心愿池不会进入主设备库列表与详情路由
 - 心愿池不会进入评分榜、持有时间榜或理财榜
-- 心愿池不会被主设备库的导入导出接口处理
+- 心愿池不会被旧版主设备库 JSON 导入导出接口处理
 
 当前导航结构：
 
 - `/`：主设备库 Dashboard
 - `/leaderboards`：排行榜
 - `/wishlist`：心愿池
-- `/devices/new`：新增主设备，同时在页底包含数据工具
+- `/devices/new`：新增主设备
+- `/data-tools`：GGPack 导入导出与数据重置
 
 ## API 概览
 
@@ -247,6 +248,9 @@ ARM 镜像标签改为 `geargrade:v0.4-arm64`。
 
 - `GET /api/v1/data/export`
 - `POST /api/v1/data/import`
+- `GET /api/v1/data/ggpack/export?scope=devices|wishlist|all`
+- `POST /api/v1/data/ggpack/preview`
+- `POST /api/v1/data/ggpack/import`
 - `POST /api/v1/data/reset`
 
 ### 媒体
@@ -260,25 +264,26 @@ ARM 镜像标签改为 `geargrade:v0.4-arm64`。
 
 ## 导入导出
 
-导入导出当前只针对主设备库，不包含心愿池。
+新版导入导出使用 Geargrade 自有 GGPack JSON 格式，扩展名建议为 `.ggpack.json`。包内按表组织，支持 `devices` 主设备库和 `wishlist` 心愿池。
 
 导入行为：
 
-- 格式：结构化 JSON
-- 策略：先去重，再追加
+- 格式：`geargrade.ggpack.v1`
+- 策略：先预览校验，再按选中行导入
 - 去重键：`brand + name + acquisition_iteration + purchase_date`
-- 重复项：跳过，不覆盖更新
+- 心愿池去重键：`brand + name + acquisition_iteration`
+- 重复项：更新覆盖
 
 模板文件：
 
 - `templates/device-import.template.json`
 - `templates/device-import.example.json`
 
-导出结果可以直接再导入，也适合“导出 -> 让 AI 整理或补全 -> 再导回”的工作流。
+旧版 `/api/v1/data/export` 与 `/api/v1/data/import` 仍保留，只处理主设备库 JSON。GGPack 导出结果可以直接再导入，也适合“导出 -> 让 AI 整理或补全 -> 再导回”的工作流。
 
 ## 数据重置
 
-“重置所有数据”入口位于“新增设备”页底部的数据工具区。
+“重置所有数据”入口位于 `/data-tools` 页面。
 
 执行规则：
 
@@ -336,5 +341,4 @@ npm test
 - 时间线视图
 - 价格波动记录
 - 多图管理
-- 心愿池专用导入导出
 - 更完整的数据备份与恢复

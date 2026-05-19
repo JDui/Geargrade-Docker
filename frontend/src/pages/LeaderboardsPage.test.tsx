@@ -1,8 +1,9 @@
 import "@testing-library/jest-dom";
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { AppSettingsProvider } from "../components/layout/AppSettingsProvider";
 import LeaderboardsPage from "./LeaderboardsPage";
 
 const mocks = vi.hoisted(() => ({
@@ -18,8 +19,20 @@ vi.mock("../api/leaderboards", () => ({
 }));
 
 describe("LeaderboardsPage", () => {
+  beforeEach(() => {
+    Object.defineProperty(window, "matchMedia", {
+      value: vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn()
+      })),
+      configurable: true
+    });
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
   });
 
   it("keeps top1 first on narrow layout", async () => {
@@ -57,7 +70,9 @@ describe("LeaderboardsPage", () => {
 
     render(
       <MemoryRouter initialEntries={["/leaderboards?tab=score&sort_order=desc"]}>
-        <LeaderboardsPage />
+        <AppSettingsProvider>
+          <LeaderboardsPage />
+        </AppSettingsProvider>
       </MemoryRouter>
     );
 
@@ -74,5 +89,39 @@ describe("LeaderboardsPage", () => {
     expect(top1Card).toHaveClass("order-1", "lg:order-2");
     expect(top2Card).toHaveClass("order-2", "lg:order-1");
     expect(top3Card).toHaveClass("order-3", "lg:order-3");
+  });
+
+  it("uses month durations in simplified mode", async () => {
+    mocks.fetchHoldingDurationLeaderboard.mockResolvedValue({
+      items: [
+        {
+          rank: 1,
+          device_id: 201,
+          name: "Long Hold",
+          brand: "Brand C",
+          score: 80,
+          rating_label: "excellent",
+          daily_cost_value: 2,
+          duration_days: 75,
+          duration_months: 2,
+          purchase_date: "2024-01-01",
+          sale_date: "2024-03-01"
+        }
+      ]
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/leaderboards?tab=holding-duration&sort_order=desc"]}>
+        <AppSettingsProvider>
+          <LeaderboardsPage />
+        </AppSettingsProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(mocks.fetchHoldingDurationLeaderboard).toHaveBeenCalledWith("desc", "months");
+    });
+
+    expect(await screen.findByText("2 个月")).toBeInTheDocument();
   });
 });

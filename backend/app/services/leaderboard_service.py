@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,6 +19,7 @@ from app.services.device_service import _score_ranking_key, calculate_daily_cost
 
 
 ACTIVE_STATUSES = {DeviceStatus.HOLDING, DeviceStatus.FOR_SALE}
+DurationUnit = Literal["days", "months"]
 
 
 def _rank_items(items):
@@ -26,7 +28,15 @@ def _rank_items(items):
     return items
 
 
-def get_holding_duration_leaderboard(session: Session, sort_order: SortOrder = "desc") -> HoldingDurationResponse:
+def _calendar_month_delta(start_date: date, end_date: date) -> int:
+    return max((end_date.year - start_date.year) * 12 + end_date.month - start_date.month, 0)
+
+
+def get_holding_duration_leaderboard(
+    session: Session,
+    sort_order: SortOrder = "desc",
+    duration_unit: DurationUnit = "days",
+) -> HoldingDurationResponse:
     today = date.today()
     devices = session.scalars(select(Device).where(Device.purchase_date.is_not(None))).all()
     items: list[HoldingDurationItem] = []
@@ -36,6 +46,7 @@ def get_holding_duration_leaderboard(session: Session, sort_order: SortOrder = "
         if end_date is None or device.purchase_date is None:
             continue
         duration_days = max((end_date - device.purchase_date).days, 0)
+        duration_months = _calendar_month_delta(device.purchase_date, end_date)
         items.append(
             HoldingDurationItem(
                 rank=0,
@@ -52,12 +63,17 @@ def get_holding_duration_leaderboard(session: Session, sort_order: SortOrder = "
                     device.sale_date,
                 ),
                 duration_days=duration_days,
+                duration_months=duration_months,
                 purchase_date=device.purchase_date.isoformat() if device.purchase_date else None,
                 sale_date=device.sale_date.isoformat() if device.sale_date else None,
             )
         )
 
-    if sort_order == "desc":
+    if duration_unit == "months" and sort_order == "desc":
+        items.sort(key=lambda item: (-item.duration_months, -item.duration_days, -item.score, item.name.lower()))
+    elif duration_unit == "months":
+        items.sort(key=lambda item: (item.duration_months, item.duration_days, item.score, item.name.lower()))
+    elif sort_order == "desc":
         items.sort(key=lambda item: (-item.duration_days, -item.score, item.name.lower()))
     else:
         items.sort(key=lambda item: (item.duration_days, item.score, item.name.lower()))

@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
+import { useAppSettings } from "../layout/AppSettingsProvider";
 import {
   CATEGORY_LABELS,
   STATUS_LABELS,
@@ -38,6 +39,8 @@ export function DeviceTable({
   editBasePath = "/devices"
 }: DeviceTableProps) {
   const navigate = useNavigate();
+  const { simplifiedMode } = useAppSettings();
+  const datePrecision: "day" | "month" = simplifiedMode ? "month" : "day";
 
   function renderSortLabel(column: SortBy, label: string) {
     const active = sortBy === column;
@@ -85,8 +88,8 @@ export function DeviceTable({
                     </div>
                   </td>
                   <td className="px-4 py-4">{formatCurrency(device.purchase_price)}</td>
-                  <td className="px-4 py-4">{formatDate(device.purchase_date)}</td>
-                  <td className="px-4 py-4">{formatDate(device.sale_date)}</td>
+                  <td className="px-4 py-4">{formatDate(device.purchase_date, datePrecision)}</td>
+                  <td className="px-4 py-4">{formatDate(device.sale_date, datePrecision)}</td>
                   <td className="px-4 py-4">{formatDailyCost(device.daily_cost_value)}</td>
                   <td className="px-4 py-4">
                     <div className="flex justify-end gap-2">

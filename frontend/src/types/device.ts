@@ -35,6 +35,7 @@ export type SortBy =
   | "updated_at"
   | "created_at";
 export type SortOrder = "asc" | "desc";
+export type DurationUnit = "days" | "months";
 export type WishlistSortBy = "name" | "brand" | "category" | "score" | "updated_at" | "created_at";
 export type ViewMode = "cards" | "table";
 export type ThemeMode = "dark" | "light";
@@ -241,6 +242,7 @@ export interface LeaderboardBaseItem {
 
 export interface HoldingDurationItem extends LeaderboardBaseItem {
   duration_days: number;
+  duration_months: number;
   purchase_date: string | null;
   sale_date: string | null;
 }
@@ -266,6 +268,10 @@ export interface FinanceLeaderboardResponse {
 }
 
 export interface DataExportResponse {
+  schema_version: string;
+  exported_at: string;
+  item_count: number;
+  source: string;
   items: DevicePayload[];
 }
 
@@ -275,11 +281,83 @@ export interface DataImportError {
   reason: string;
 }
 
+export interface DataImportSkippedDetail {
+  index: number;
+  name: string | null;
+  reason: string;
+}
+
 export interface DataImportResponse {
   total: number;
   created: number;
   skipped: number;
+  skipped_details: DataImportSkippedDetail[];
   errors: DataImportError[];
+}
+
+export type GGPackScope = "devices" | "wishlist" | "all";
+export type GGPackTableName = "devices" | "wishlist";
+export type GGPackRow = Record<string, unknown>;
+
+export interface GGPackTable {
+  name: GGPackTableName;
+  columns: string[];
+  rows: GGPackRow[];
+  dedup_key: string[];
+}
+
+export interface GGPack {
+  format: "geargrade.ggpack.v1";
+  schema_version: string;
+  exported_at: string;
+  tables: GGPackTable[];
+  counts: Partial<Record<GGPackTableName, number>>;
+}
+
+export interface GGPackRowError {
+  table: GGPackTableName;
+  index: number;
+  name: string | null;
+  reason: string;
+}
+
+export interface GGPackRowPreview {
+  index: number;
+  name: string | null;
+  action: "create" | "update" | "skip" | "error";
+  selected: boolean;
+  reason: string | null;
+}
+
+export interface GGPackTablePreview {
+  name: GGPackTableName;
+  total: number;
+  valid: number;
+  create: number;
+  update: number;
+  skipped: number;
+  errors: GGPackRowError[];
+  rows: GGPackRowPreview[];
+}
+
+export interface GGPackPreviewResponse {
+  format: "geargrade.ggpack.v1";
+  mode: "update";
+  tables: GGPackTablePreview[];
+}
+
+export interface GGPackImportRequest {
+  package: GGPack;
+  mode: "update";
+  selection: Partial<Record<GGPackTableName, number[]>>;
+}
+
+export interface GGPackImportResponse {
+  total: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: GGPackRowError[];
 }
 
 export interface DataResetResponse {

@@ -35,7 +35,6 @@ class WishlistDeviceBase(BaseModel):
 
     @field_validator(
         "mount_system_custom",
-        "review_detail",
         "image_original_url",
         "image_storage_path",
         "image_storage_name",
@@ -46,6 +45,15 @@ class WishlistDeviceBase(BaseModel):
         if isinstance(value, str):
             value = value.strip()
             return value or None
+        return value
+
+    @field_validator("review_detail", mode="before")
+    @classmethod
+    def normalize_review_detail(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip()
+        if value is None:
+            return ""
         return value
 
 

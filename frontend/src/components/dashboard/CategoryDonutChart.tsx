@@ -1,6 +1,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import { CATEGORY_LABELS, type DashboardBucket, type DeviceCategory } from "../../types/device";
+import { useAppSettings } from "../layout/AppSettingsProvider";
 
 const palette = ["#5cc8ff", "#55d39b", "#f7c95f", "#f27b8b", "#b28cff", "#3ed0c3"];
 
@@ -9,6 +10,7 @@ interface CategoryDonutChartProps {
 }
 
 export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
+  const { reduceMotion } = useAppSettings();
   const total = data.reduce((sum, item) => sum + item.count, 0);
   const chartData = data.map((item) => ({
     ...item,
@@ -29,7 +31,7 @@ export function CategoryDonutChart({ data }: CategoryDonutChartProps) {
                 innerRadius={46}
                 outerRadius={72}
                 paddingAngle={3}
-                isAnimationActive
+                isAnimationActive={!reduceMotion}
                 animationDuration={1000}
                 animationEasing="ease-out"
               >
