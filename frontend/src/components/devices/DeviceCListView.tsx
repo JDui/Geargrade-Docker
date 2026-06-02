@@ -1,7 +1,7 @@
 import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
-  type WheelEvent as ReactWheelEvent,
+  useEffect,
   useMemo,
   useRef,
   useState
@@ -45,6 +45,9 @@ const ITEM_START_Y = 172;
 const LEFT_PAD = 160;
 const RIGHT_PAD = 160;
 const BOTTOM_PAD = 120;
+const MAX_SCALE = 2.4;
+const DEFAULT_MIN_SCALE = 0.12;
+const FIT_PADDING = 32;
 
 const statusPalette: Record<DeviceStatus, string> = {
   holding: "border-success/50 text-success",
@@ -62,6 +65,15 @@ const ratingPalette: Record<RatingLabel, string> = {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function fitScaleForViewport(width: number, height: number, canvasWidth: number, canvasHeight: number): number {
+  if (width <= 0 || height <= 0) {
+    return DEFAULT_MIN_SCALE;
+  }
+
+  const scale = Math.min((width - FIT_PADDING) / canvasWidth, (height - FIT_PADDING) / canvasHeight);
+  return clamp(scale, 0.03, 1);
 }
 
 function purchaseYear(device: DeviceListItem): string {
@@ -150,23 +162,25 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
   const firstColumnX = LEFT_PAD;
   const lastColumnX = LEFT_PAD + Math.max(groups.length - 1, 0) * COLUMN_WIDTH;
 
-  function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
-    event.preventDefault();
-
+  function zoomAt(clientX: number, clientY: number, deltaY: number) {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
     const rect = viewport.getBoundingClientRect();
-    const pointerX = event.clientX - rect.left;
-    const pointerY = event.clientY - rect.top;
-    const nextScale = clamp(view.scale * (event.deltaY > 0 ? 0.9 : 1.1), 0.45, 2.4);
-    const worldX = (pointerX - view.x) / view.scale;
-    const worldY = (pointerY - view.y) / view.scale;
+    const pointerX = clientX - rect.left;
+    const pointerY = clientY - rect.top;
+    const minScale = Math.min(DEFAULT_MIN_SCALE, fitScaleForViewport(rect.width, rect.height, canvasWidth, canvasHeight));
 
-    setView({
-      scale: nextScale,
-      x: pointerX - worldX * nextScale,
-      y: pointerY - worldY * nextScale
+    setView((current) => {
+      const nextScale = clamp(current.scale * (deltaY > 0 ? 0.9 : 1.1), minScale, MAX_SCALE);
+      const worldX = (pointerX - current.x) / current.scale;
+      const worldY = (pointerY - current.y) / current.scale;
+
+      return {
+        scale: nextScale,
+        x: pointerX - worldX * nextScale,
+        y: pointerY - worldY * nextScale
+      };
     });
   }
 
@@ -215,6 +229,19 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     setView({ scale: 1, x: 0, y: 0 });
   }
 
+  function handleFitView() {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const rect = viewport.getBoundingClientRect();
+    const nextScale = fitScaleForViewport(rect.width, rect.height, canvasWidth, canvasHeight);
+    setView({
+      scale: nextScale,
+      x: Math.max(FIT_PADDING / 2, (rect.width - canvasWidth * nextScale) / 2),
+      y: Math.max(FIT_PADDING / 2, (rect.height - canvasHeight * nextScale) / 2)
+    });
+  }
+
   function handleNodeClick(deviceId: number) {
     if (dragState.current.moved) {
       dragState.current.moved = false;
@@ -229,6 +256,22 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
     transformOrigin: "0 0"
   };
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return undefined;
+
+    function handleNativeWheel(event: WheelEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      zoomAt(event.clientX, event.clientY, event.deltaY);
+    }
+
+    viewport.addEventListener("wheel", handleNativeWheel, { passive: false });
+    return () => {
+      viewport.removeEventListener("wheel", handleNativeWheel);
+    };
+  }, [canvasHeight, canvasWidth]);
 
   return (
     <section className="panel overflow-hidden">
@@ -245,6 +288,9 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
             <button type="button" className="button-secondary px-3 py-1 text-xs" onClick={handleResetView}>
               Reset
             </button>
+            <button type="button" className="button-secondary px-3 py-1 text-xs" onClick={handleFitView}>
+              Fit
+            </button>
           </div>
         </div>
       </div>
@@ -258,7 +304,6 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onWheel={handleWheel}
       >
         <div data-testid="clist-canvas" className="relative bg-panelAlt" style={transformStyle}>
           <svg

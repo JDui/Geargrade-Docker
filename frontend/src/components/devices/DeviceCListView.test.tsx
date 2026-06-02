@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { DeviceCListView } from "./DeviceCListView";
@@ -118,8 +118,18 @@ describe("DeviceCListView", () => {
         toJSON: () => ({})
       }) as DOMRect;
 
-    fireEvent.wheel(viewport, { deltaY: -100, clientX: 200, clientY: 160 });
+    const zoomInEvent = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaY: -100, clientX: 200, clientY: 160 });
+    act(() => {
+      viewport.dispatchEvent(zoomInEvent);
+    });
+    expect(zoomInEvent.defaultPrevented).toBe(true);
     expect(canvas.style.transform).toContain("scale(1.1)");
+
+    for (let index = 0; index < 12; index += 1) {
+      fireEvent.wheel(viewport, { deltaY: 100, clientX: 200, clientY: 160 });
+    }
+    expect(canvas.style.transform).toContain("scale(0.");
+    expect(canvas.style.transform).not.toContain("scale(0.45)");
 
     for (const button of [0, 1, 2]) {
       fireEvent.pointerDown(viewport, { button, pointerId: button + 1, clientX: 100, clientY: 100 });
@@ -128,5 +138,39 @@ describe("DeviceCListView", () => {
     }
 
     expect(canvas.style.transform).toContain("translate(");
+  });
+
+  it("fits a large tree into the viewport", () => {
+    const manyItems = Array.from({ length: 24 }, (_, index): DeviceListItem => ({
+      ...items[0],
+      id: index + 10,
+      name: `Device ${index + 1}`,
+      purchase_date: `${2020 + index}-01-01`
+    }));
+
+    render(
+      <MemoryRouter>
+        <DeviceCListView items={manyItems} detailBasePath="/clist/devices" />
+      </MemoryRouter>
+    );
+
+    const viewport = screen.getByTestId("clist-viewport");
+    const canvas = screen.getByTestId("clist-canvas");
+    viewport.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 600,
+        right: 800,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    fireEvent.click(screen.getByRole("button", { name: "Fit" }));
+
+    expect(canvas.style.transform).toContain("scale(0.");
   });
 });
