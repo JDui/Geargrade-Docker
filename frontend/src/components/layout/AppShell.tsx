@@ -82,6 +82,9 @@ export function AppShell() {
             <NavLink to="/" end className={navClassName}>
               概览
             </NavLink>
+            <NavLink to="/clist" className={navClassName}>
+              CList
+            </NavLink>
             <NavLink to="/archive" className={navClassName}>
               档案库
             </NavLink>

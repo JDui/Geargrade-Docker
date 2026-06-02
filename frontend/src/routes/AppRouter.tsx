@@ -2,6 +2,7 @@ import { Navigate, Outlet, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "../components/layout/AppShell";
 import ArchivePage from "../pages/ArchivePage";
+import CListPage from "../pages/CListPage";
 import DataToolsPage from "../pages/DataToolsPage";
 import DashboardPage from "../pages/DashboardPage";
 import DeviceFormPage from "../pages/DeviceFormPage";
@@ -22,6 +23,15 @@ function ArchiveLayout() {
   return (
     <>
       <ArchivePage />
+      <Outlet />
+    </>
+  );
+}
+
+function CListLayout() {
+  return (
+    <>
+      <CListPage />
       <Outlet />
     </>
   );
@@ -52,6 +62,9 @@ export function AppRouter() {
         <Route path="/" element={<OverviewLayout />}>
           <Route path="holding" element={null} />
           <Route path="holding/devices/:deviceId" element={null} />
+          <Route path="devices/:deviceId" element={null} />
+        </Route>
+        <Route path="/clist" element={<CListLayout />}>
           <Route path="devices/:deviceId" element={null} />
         </Route>
         <Route path="/archive" element={<ArchiveLayout />}>

@@ -8,6 +8,9 @@ export function pageKey(pathname: string) {
   if (pathname.startsWith("/archive")) {
     return "archive";
   }
+  if (pathname.startsWith("/clist")) {
+    return "clist";
+  }
   if (pathname.startsWith("/leaderboards")) {
     return "leaderboards";
   }
@@ -24,6 +27,7 @@ export function isDrawerRoute(pathname: string) {
   return (
     /^\/devices\/\d+$/.test(pathname) ||
     /^\/holding(\/devices\/\d+)?$/.test(pathname) ||
+    /^\/clist\/devices\/\d+$/.test(pathname) ||
     /^\/archive\/devices\/\d+$/.test(pathname) ||
     /^\/leaderboards\/devices\/\d+$/.test(pathname) ||
     /^\/wishlist\/devices\/\d+$/.test(pathname)
