@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { AppSettingsProvider } from "../components/layout/AppSettingsProvider";
@@ -143,6 +143,120 @@ describe("AppRouter", () => {
 
     await waitFor(() => {
       expect(screen.getByText("设备详情")).toBeInTheDocument();
+    });
+  });
+
+  it("opens the detail drawer when a CList node icon is clicked", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/dashboard/summary")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              currently_owned_count: 1,
+              sold_count: 0,
+              feeling_in_progress_count: 0,
+              ratings: [],
+              purchase_years: [{ year: 2023, count: 1 }],
+              purchase_year_category_breakdown: [],
+              purchase_year_rating_breakdown: [],
+              categories: []
+            })
+          )
+        );
+      }
+      if (url.includes("/devices/42")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 42,
+              name: "Fujifilm X-T5",
+              brand: "Fujifilm",
+              category: "camera_body",
+              mount_system_key: "x",
+              mount_system_custom: null,
+              mount_system_label: "X",
+              status: "holding",
+              score: 103,
+              rating_label: "god",
+              score_rank: 1,
+              acquisition_iteration: 1,
+              tags: ["CList"],
+              purchase_price: 12500,
+              sale_price: null,
+              daily_cost_value: null,
+              purchase_date: "2023-10-01",
+              sale_date: null,
+              image_source_type: null,
+              image_original_url: null,
+              image_storage_path: null,
+              image_storage_name: null,
+              image_url: null,
+              created_at: "2025-01-01T00:00:00",
+              updated_at: "2025-01-01T00:00:00",
+              pros: [],
+              cons: [],
+              review_detail: ""
+            })
+          )
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 42,
+                name: "Fujifilm X-T5",
+                brand: "Fujifilm",
+                category: "camera_body",
+                mount_system_key: "x",
+                mount_system_custom: null,
+                mount_system_label: "X",
+                status: "holding",
+                score: 103,
+                rating_label: "god",
+                acquisition_iteration: 1,
+                tags: ["CList"],
+                purchase_price: 12500,
+                sale_price: null,
+                daily_cost_value: null,
+                purchase_date: "2023-10-01",
+                sale_date: null,
+                image_source_type: null,
+                image_original_url: null,
+                image_storage_path: null,
+                image_storage_name: null,
+                image_url: null,
+                created_at: "2025-01-01T00:00:00",
+                updated_at: "2025-01-01T00:00:00"
+              }
+            ],
+            total: 1
+          })
+        )
+      );
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ThemeProvider>
+        <AppSettingsProvider>
+          <DashboardSummaryProvider>
+            <MemoryRouter initialEntries={["/clist"]}>
+              <AppRouter />
+            </MemoryRouter>
+          </DashboardSummaryProvider>
+        </AppSettingsProvider>
+      </ThemeProvider>
+    );
+
+    fireEvent.click(await screen.findByTestId("clist-device-icon-holding-42"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/v1/devices/42", expect.anything());
+      expect(document.querySelector(".drawer-panel")).toBeInTheDocument();
     });
   });
 

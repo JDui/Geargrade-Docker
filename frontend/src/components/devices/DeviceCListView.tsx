@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import {
   CATEGORY_LABELS,
   STATUS_LABELS,
+  type DeviceCategory,
   type DeviceListItem,
   type DeviceStatus,
   type RatingLabel
@@ -23,10 +24,37 @@ interface DeviceCListViewProps {
   detailBasePath?: string;
 }
 
-interface YearGroup {
-  key: string;
+interface CategoryGroup {
+  key: DeviceCategory;
   label: string;
   items: DeviceListItem[];
+}
+
+interface CListColumn {
+  key: string;
+  label: string;
+  categoryGroups: CategoryGroup[];
+}
+
+interface PositionedDevice {
+  device: DeviceListItem;
+  y: number;
+}
+
+interface PositionedCategory {
+  key: DeviceCategory;
+  label: string;
+  y: number;
+  items: PositionedDevice[];
+  bottomY: number;
+}
+
+interface PositionedColumn {
+  key: string;
+  label: string;
+  x: number;
+  categoryGroups: PositionedCategory[];
+  bottomY: number;
 }
 
 interface ViewTransform {
@@ -41,13 +69,16 @@ const ITEM_GAP = 126;
 const ROOT_Y = 32;
 const TRUNK_Y = 88;
 const YEAR_Y = 112;
-const ITEM_START_Y = 172;
+const CATEGORY_START_Y = 166;
+const CATEGORY_ITEM_START_OFFSET = 46;
+const CATEGORY_GAP = 34;
 const LEFT_PAD = 160;
 const RIGHT_PAD = 160;
 const BOTTOM_PAD = 120;
 const MAX_SCALE = 2.4;
 const DEFAULT_MIN_SCALE = 0.12;
 const FIT_PADDING = 32;
+const NODE_ICON_OFFSET = 18;
 
 const statusPalette: Record<DeviceStatus, string> = {
   holding: "border-success/50 text-success",
@@ -62,6 +93,8 @@ const ratingPalette: Record<RatingLabel, string> = {
   average: "text-accent",
   low: "text-danger"
 };
+
+const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS) as DeviceCategory[];
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -119,7 +152,23 @@ function titleClass(device: DeviceListItem): string {
   return "text-textPrimary";
 }
 
-function buildYearGroups(items: DeviceListItem[]): YearGroup[] {
+function buildCategoryGroups(items: DeviceListItem[]): CategoryGroup[] {
+  const groups = new Map<DeviceCategory, DeviceListItem[]>();
+
+  for (const item of items) {
+    const current = groups.get(item.category) ?? [];
+    current.push(item);
+    groups.set(item.category, current);
+  }
+
+  return CATEGORY_ORDER.filter((category) => groups.has(category)).map((category) => ({
+    key: category,
+    label: CATEGORY_LABELS[category],
+    items: (groups.get(category) ?? []).slice().sort(compareByPurchaseDate)
+  }));
+}
+
+function buildYearGroups(items: DeviceListItem[]): CListColumn[] {
   const groups = new Map<string, DeviceListItem[]>();
 
   for (const item of items) {
@@ -136,10 +185,54 @@ function buildYearGroups(items: DeviceListItem[]): YearGroup[] {
       return Number(left) - Number(right);
     })
     .map(([key, groupItems]) => ({
-      key,
+      key: `year-${key}`,
       label: key === "undated" ? "No Date" : key,
-      items: groupItems.slice().sort(compareByPurchaseDate)
+      categoryGroups: buildCategoryGroups(groupItems)
     }));
+}
+
+function buildCListColumns(items: DeviceListItem[]): CListColumn[] {
+  const holdingItems = items.filter((item) => item.status === "holding");
+
+  return [
+    {
+      key: "holding",
+      label: "持有设备",
+      categoryGroups: buildCategoryGroups(holdingItems)
+    },
+    ...buildYearGroups(items)
+  ];
+}
+
+function layoutColumns(columns: CListColumn[]): PositionedColumn[] {
+  return columns.map((column, columnIndex) => {
+    let cursorY = CATEGORY_START_Y;
+    const x = LEFT_PAD + columnIndex * COLUMN_WIDTH;
+    const categoryGroups = column.categoryGroups.map((category) => {
+      const y = cursorY;
+      const positionedItems = category.items.map((device, itemIndex) => ({
+        device,
+        y: y + CATEGORY_ITEM_START_OFFSET + itemIndex * ITEM_GAP
+      }));
+      const lastItem = positionedItems.at(-1);
+      const bottomY = lastItem ? lastItem.y + 90 : y + 24;
+      cursorY = bottomY + CATEGORY_GAP;
+
+      return {
+        ...category,
+        y,
+        items: positionedItems,
+        bottomY
+      };
+    });
+
+    return {
+      ...column,
+      x,
+      categoryGroups,
+      bottomY: Math.max(YEAR_Y + 72, cursorY - CATEGORY_GAP)
+    };
+  });
 }
 
 export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCListViewProps) {
@@ -154,13 +247,12 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     originY: 0
   });
   const [view, setView] = useState<ViewTransform>({ scale: 1, x: 0, y: 0 });
-  const groups = useMemo(() => buildYearGroups(items), [items]);
-  const maxItems = Math.max(1, ...groups.map((group) => group.items.length));
-  const canvasWidth = Math.max(760, LEFT_PAD + RIGHT_PAD + Math.max(groups.length - 1, 0) * COLUMN_WIDTH);
-  const canvasHeight = ITEM_START_Y + maxItems * ITEM_GAP + BOTTOM_PAD;
+  const columns = useMemo(() => layoutColumns(buildCListColumns(items)), [items]);
+  const canvasWidth = Math.max(760, LEFT_PAD + RIGHT_PAD + Math.max(columns.length - 1, 0) * COLUMN_WIDTH);
+  const canvasHeight = Math.max(420, Math.max(...columns.map((column) => column.bottomY), YEAR_Y + 72) + BOTTOM_PAD);
   const rootX = canvasWidth / 2;
   const firstColumnX = LEFT_PAD;
-  const lastColumnX = LEFT_PAD + Math.max(groups.length - 1, 0) * COLUMN_WIDTH;
+  const lastColumnX = LEFT_PAD + Math.max(columns.length - 1, 0) * COLUMN_WIDTH;
 
   function zoomAt(clientX: number, clientY: number, deltaY: number) {
     const viewport = viewportRef.current;
@@ -184,7 +276,8 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     });
   }
 
-  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+  function handlePointerDown(event: ReactPointerEvent<HTMLElement>) {
+    event.stopPropagation();
     if (![0, 1, 2].includes(event.button)) return;
 
     if (event.button !== 0) {
@@ -201,7 +294,8 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     };
   }
 
-  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+  function handlePointerMove(event: ReactPointerEvent<HTMLElement>) {
+    event.stopPropagation();
     const current = dragState.current;
     if (!current.active) return;
 
@@ -218,7 +312,8 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     }));
   }
 
-  function handlePointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+  function handlePointerUp(event: ReactPointerEvent<HTMLElement>) {
+    event.stopPropagation();
     if (dragState.current.active) {
       event.currentTarget.releasePointerCapture?.(event.pointerId);
     }
@@ -285,10 +380,10 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
             <div className="rounded-full border border-line bg-panel px-3 py-1 text-xs text-textSecondary">
               {items.length} nodes / {Math.round(view.scale * 100)}%
             </div>
-            <button type="button" className="button-secondary px-3 py-1 text-xs" onClick={handleResetView}>
+            <button type="button" className="button-secondary px-3 py-1 text-xs" onPointerDown={(event) => event.stopPropagation()} onClick={handleResetView}>
               Reset
             </button>
-            <button type="button" className="button-secondary px-3 py-1 text-xs" onClick={handleFitView}>
+            <button type="button" className="button-secondary px-3 py-1 text-xs" onPointerDown={(event) => event.stopPropagation()} onClick={handleFitView}>
               Fit
             </button>
           </div>
@@ -298,14 +393,14 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
       <div
         ref={viewportRef}
         data-testid="clist-viewport"
-        className="h-[72vh] min-h-[32rem] touch-none overflow-hidden bg-panelAlt text-textPrimary"
+        className="h-[72vh] min-h-[32rem] touch-none select-none overflow-hidden bg-panelAlt text-textPrimary"
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <div data-testid="clist-canvas" className="relative bg-panelAlt" style={transformStyle}>
+        <div data-testid="clist-canvas" className="relative select-none bg-panelAlt" style={transformStyle}>
           <svg
             className="absolute inset-0 h-full w-full"
             viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
@@ -313,20 +408,27 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
           >
             <line x1={rootX} y1={ROOT_Y + 26} x2={rootX} y2={TRUNK_Y} className="stroke-textSecondary/55" strokeWidth="2" />
             <line x1={firstColumnX} y1={TRUNK_Y} x2={lastColumnX} y2={TRUNK_Y} className="stroke-textSecondary/55" strokeWidth="2" />
-            {groups.map((group, groupIndex) => {
-              const columnX = LEFT_PAD + groupIndex * COLUMN_WIDTH;
-              const groupBottom = ITEM_START_Y + Math.max(group.items.length - 1, 0) * ITEM_GAP + 90;
-
+            {columns.map((column) => {
               return (
-                <g key={group.key}>
-                  <line x1={columnX} y1={TRUNK_Y} x2={columnX} y2={YEAR_Y - 10} className="stroke-textSecondary/55" strokeWidth="2" />
-                  <line x1={columnX} y1={YEAR_Y + 24} x2={columnX} y2={groupBottom} className="stroke-textSecondary/45" strokeWidth="1.5" />
-                  {group.items.map((device, itemIndex) => {
-                    const itemY = ITEM_START_Y + itemIndex * ITEM_GAP;
+                <g key={column.key}>
+                  <line x1={column.x} y1={TRUNK_Y} x2={column.x} y2={YEAR_Y - 10} className="stroke-textSecondary/55" strokeWidth="2" />
+                  <line x1={column.x} y1={YEAR_Y + 24} x2={column.x} y2={column.bottomY} className="stroke-textSecondary/45" strokeWidth="1.5" />
+                  {column.categoryGroups.map((category) => {
+                    const iconX = column.x - CARD_WIDTH / 2 - NODE_ICON_OFFSET;
+                    const categoryNodeY = category.y + 12;
+                    const lastItem = category.items.at(-1);
                     return (
-                      <g key={device.id}>
-                        <line x1={columnX} y1={itemY + 22} x2={columnX - CARD_WIDTH / 2 + 10} y2={itemY + 22} className="stroke-textSecondary/45" strokeWidth="1.5" />
-                        <circle cx={columnX} cy={itemY + 22} r="3" className="fill-accent/70" />
+                      <g key={category.key}>
+                        <line x1={column.x} y1={categoryNodeY} x2={iconX} y2={categoryNodeY} className="stroke-textSecondary/45" strokeWidth="1.5" />
+                        {lastItem ? (
+                          <line x1={iconX} y1={categoryNodeY} x2={iconX} y2={lastItem.y + 22} className="stroke-textSecondary/35" strokeWidth="1.5" />
+                        ) : null}
+                        <circle cx={iconX} cy={categoryNodeY} r="4" className="fill-textSecondary/70" />
+                        {category.items.map((item) => (
+                          <g key={item.device.id}>
+                            <circle cx={iconX} cy={item.y + 22} r="3" className="fill-accent/70" />
+                          </g>
+                        ))}
                       </g>
                     );
                   })}
@@ -342,50 +444,100 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
             CList
           </div>
 
-          {groups.map((group, groupIndex) => {
-            const columnX = LEFT_PAD + groupIndex * COLUMN_WIDTH;
+          {columns.map((column) => {
             return (
-              <div key={group.key}>
+              <div key={column.key}>
                 <div
                   className="absolute rounded border border-line bg-panel px-2 py-0.5 text-[10px] font-semibold text-textPrimary shadow-sm"
-                  style={{ left: columnX, top: YEAR_Y, transform: "translateX(-50%)" }}
+                  style={{ left: column.x, top: YEAR_Y, transform: "translateX(-50%)" }}
                 >
-                  {group.label}
+                  {column.label}
                 </div>
 
-                {group.items.map((device, itemIndex) => {
-                  const itemY = ITEM_START_Y + itemIndex * ITEM_GAP;
+                {!column.categoryGroups.length ? (
+                  <div
+                    className="absolute rounded border border-line/70 bg-panel/70 px-2 py-1 text-[10px] text-textSecondary"
+                    style={{ left: column.x - CARD_WIDTH / 2, top: CATEGORY_START_Y, width: CARD_WIDTH }}
+                  >
+                    No devices
+                  </div>
+                ) : null}
+
+                {column.categoryGroups.map((category) => {
+                  const iconX = column.x - CARD_WIDTH / 2 - NODE_ICON_OFFSET;
                   return (
-                    <button
-                      key={device.id}
-                      type="button"
-                      className="group absolute min-h-[5.7rem] rounded-md border border-line bg-panel/90 px-3 py-2 text-left shadow-sm transition hover:border-accent hover:bg-panel"
-                      style={{ left: columnX - CARD_WIDTH / 2, top: itemY, width: CARD_WIDTH }}
-                      onClick={() => handleNodeClick(device.id)}
-                    >
-                      <span className={`block truncate text-[12px] font-semibold leading-5 ${titleClass(device)}`}>
-                        {formatDeviceTitle(device)}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[10px] leading-4 text-textSecondary">
-                        {device.brand} / {CATEGORY_LABELS[device.category]}
-                      </span>
-                      <span className="mt-1 flex flex-wrap gap-1.5">
-                        <span className={`rounded-sm border px-1.5 py-0.5 text-[9px] ${statusPalette[device.status]}`}>
-                          {STATUS_LABELS[device.status]}
+                    <div key={category.key}>
+                      <div
+                        data-testid={`clist-category-${column.key}-${category.key}`}
+                        className="absolute rounded border border-textSecondary/35 bg-panel px-2 py-1 text-[10px] font-semibold text-textPrimary shadow-sm"
+                        style={{ left: column.x - CARD_WIDTH / 2, top: category.y, width: CARD_WIDTH }}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerUp}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate">{category.label}</span>
+                          <span className="text-textSecondary">{category.items.length}</span>
                         </span>
-                        <span className="rounded-sm border border-line px-1.5 py-0.5 text-[9px] text-textSecondary">
-                          {scoreText(device)}
-                        </span>
-                        {device.rating_label ? (
-                          <span className="rounded-sm border border-line px-1.5 py-0.5 text-[9px] text-textSecondary">
-                            {ratingLabelText(device.rating_label)}
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-1 block truncate text-[10px] leading-4 text-textSecondary">
-                        {formatDate(device.purchase_date)} / {formatCurrency(device.purchase_price)}
-                      </span>
-                    </button>
+                      </div>
+
+                      {category.items.map((item) => {
+                        const { device } = item;
+                        return (
+                          <div key={device.id}>
+                            <button
+                              type="button"
+                              data-testid={`clist-device-icon-${column.key}-${device.id}`}
+                              className="absolute z-20 h-5 w-5 rounded-full border border-accent/60 bg-panel shadow-sm transition hover:border-accent hover:bg-accent/15 focus:outline-none focus:ring-2 focus:ring-accent/45"
+                              style={{ left: iconX, top: item.y + 22, transform: "translate(-50%, -50%)" }}
+                              aria-label={`Open ${device.name} details from ${column.label} / ${category.label}`}
+                              onPointerDown={handlePointerDown}
+                              onPointerMove={handlePointerMove}
+                              onPointerUp={handlePointerUp}
+                              onPointerCancel={handlePointerUp}
+                              onClick={() => handleNodeClick(device.id)}
+                            >
+                              <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent" />
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`clist-device-${column.key}-${device.id}`}
+                              className="group absolute min-h-[5.7rem] rounded-md border border-line bg-panel/90 px-3 py-2 text-left shadow-sm transition hover:border-accent hover:bg-panel"
+                              style={{ left: column.x - CARD_WIDTH / 2, top: item.y, width: CARD_WIDTH }}
+                              onPointerDown={handlePointerDown}
+                              onPointerMove={handlePointerMove}
+                              onPointerUp={handlePointerUp}
+                              onPointerCancel={handlePointerUp}
+                              onClick={() => handleNodeClick(device.id)}
+                            >
+                              <span className={`block truncate text-[12px] font-semibold leading-5 ${titleClass(device)}`}>
+                                {formatDeviceTitle(device)}
+                              </span>
+                              <span className="mt-0.5 block truncate text-[10px] leading-4 text-textSecondary">
+                                {device.brand} / {CATEGORY_LABELS[device.category]}
+                              </span>
+                              <span className="mt-1 flex flex-wrap gap-1.5">
+                                <span className={`rounded-sm border px-1.5 py-0.5 text-[9px] ${statusPalette[device.status]}`}>
+                                  {STATUS_LABELS[device.status]}
+                                </span>
+                                <span className="rounded-sm border border-line px-1.5 py-0.5 text-[9px] text-textSecondary">
+                                  {scoreText(device)}
+                                </span>
+                                {device.rating_label ? (
+                                  <span className="rounded-sm border border-line px-1.5 py-0.5 text-[9px] text-textSecondary">
+                                    {ratingLabelText(device.rating_label)}
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="mt-1 block truncate text-[10px] leading-4 text-textSecondary">
+                                {formatDate(device.purchase_date)} / {formatCurrency(device.purchase_price)}
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   );
                 })}
               </div>

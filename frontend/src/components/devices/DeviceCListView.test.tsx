@@ -65,6 +65,12 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
+function dispatchPointerMouseEvent(target: Element, type: string, init: MouseEventInit) {
+  act(() => {
+    target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, ...init }));
+  });
+}
+
 describe("DeviceCListView", () => {
   it("renders the CList timeline groups and opens detail routes", () => {
     render(
@@ -84,13 +90,89 @@ describe("DeviceCListView", () => {
     );
 
     expect(screen.getByText("CList Map")).toBeInTheDocument();
+    expect(screen.getByText("持有设备")).toBeInTheDocument();
     expect(screen.getByText("2020")).toBeInTheDocument();
     expect(screen.getByText("2023")).toBeInTheDocument();
     expect(screen.getByText("A7M3")).toBeInTheDocument();
-    expect(screen.getByText(/X-T5/)).toBeInTheDocument();
+    expect(screen.getAllByText(/X-T5/)).toHaveLength(2);
+    expect(screen.getByTestId("clist-category-holding-camera_body")).toBeInTheDocument();
+    expect(screen.getByTestId("clist-category-year-2020-camera_body")).toBeInTheDocument();
+    expect(screen.getByTestId("clist-category-year-2023-camera_body")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("clist-category-holding-camera_body").compareDocumentPosition(screen.getByTestId("clist-device-holding-2")) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId("clist-category-year-2023-camera_body").compareDocumentPosition(screen.getByTestId("clist-device-year-2023-2")) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: /X-T5/ }));
+    fireEvent.click(screen.getByTestId("clist-device-year-2023-2"));
 
+    expect(screen.getByTestId("location")).toHaveTextContent("/clist/devices/2");
+  });
+
+  it("opens detail routes from node icons", () => {
+    render(
+      <MemoryRouter initialEntries={["/clist"]}>
+        <Routes>
+          <Route
+            path="/clist/*"
+            element={
+              <>
+                <DeviceCListView items={items} detailBasePath="/clist/devices" />
+                <LocationProbe />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId("clist-device-icon-year-2020-1"));
+
+    expect(screen.getByTestId("location")).toHaveTextContent("/clist/devices/1");
+  });
+
+  it("pans from device cards and category labels while preserving click navigation", () => {
+    render(
+      <MemoryRouter initialEntries={["/clist"]}>
+        <Routes>
+          <Route
+            path="/clist/*"
+            element={
+              <>
+                <DeviceCListView items={items} detailBasePath="/clist/devices" />
+                <LocationProbe />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const viewport = screen.getByTestId("clist-viewport");
+    const canvas = screen.getByTestId("clist-canvas");
+    const card = screen.getByTestId("clist-device-year-2023-2");
+
+    dispatchPointerMouseEvent(card, "pointerdown", { button: 0, clientX: 100, clientY: 100 });
+    dispatchPointerMouseEvent(card, "pointermove", { button: 0, clientX: 150, clientY: 150 });
+    dispatchPointerMouseEvent(card, "pointerup", { button: 0, clientX: 150, clientY: 150 });
+
+    expect(canvas.style.transform).toContain("translate(50px, 50px)");
+    expect(screen.getByTestId("location")).toHaveTextContent("/clist");
+
+    const category = screen.getByTestId("clist-category-year-2023-camera_body");
+    dispatchPointerMouseEvent(category, "pointerdown", { button: 0, clientX: 150, clientY: 150 });
+    dispatchPointerMouseEvent(category, "pointermove", { button: 0, clientX: 170, clientY: 180 });
+    dispatchPointerMouseEvent(category, "pointerup", { button: 0, clientX: 170, clientY: 180 });
+
+    expect(canvas.style.transform).toContain("translate(70px, 80px)");
+
+    fireEvent.click(card);
+    expect(screen.getByTestId("location")).toHaveTextContent("/clist");
+
+    fireEvent.click(card);
     expect(screen.getByTestId("location")).toHaveTextContent("/clist/devices/2");
   });
 
@@ -104,7 +186,9 @@ describe("DeviceCListView", () => {
     const viewport = screen.getByTestId("clist-viewport");
     const canvas = screen.getByTestId("clist-canvas");
     expect(viewport).toHaveClass("bg-panelAlt");
+    expect(viewport).toHaveClass("select-none");
     expect(canvas).toHaveClass("bg-panelAlt");
+    expect(canvas).toHaveClass("select-none");
     viewport.getBoundingClientRect = () =>
       ({
         left: 0,
