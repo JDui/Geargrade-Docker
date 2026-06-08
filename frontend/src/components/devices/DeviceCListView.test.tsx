@@ -65,9 +65,15 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function dispatchPointerMouseEvent(target: Element, type: string, init: MouseEventInit) {
+function dispatchPointerMouseEvent(target: Element, type: string, init: MouseEventInit & { pointerId?: number; pointerType?: string }) {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, ...init });
+  Object.defineProperties(event, {
+    pointerId: { value: init.pointerId ?? 1 },
+    pointerType: { value: init.pointerType ?? "mouse" }
+  });
+
   act(() => {
-    target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, ...init }));
+    target.dispatchEvent(event);
   });
 }
 
@@ -222,6 +228,77 @@ describe("DeviceCListView", () => {
     }
 
     expect(canvas.style.transform).toContain("translate(");
+  });
+
+  it("pans from touchpad wheel gestures and zooms from touchpad pinch wheel gestures", () => {
+    render(
+      <MemoryRouter>
+        <DeviceCListView items={items} detailBasePath="/clist/devices" />
+      </MemoryRouter>
+    );
+
+    const viewport = screen.getByTestId("clist-viewport");
+    const canvas = screen.getByTestId("clist-canvas");
+    viewport.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 600,
+        right: 800,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    const panEvent = new WheelEvent("wheel", { bubbles: true, cancelable: true, deltaX: 20, deltaY: 40, clientX: 200, clientY: 160 });
+    act(() => {
+      viewport.dispatchEvent(panEvent);
+    });
+
+    expect(panEvent.defaultPrevented).toBe(true);
+    expect(canvas.style.transform).toContain("translate(-20px, -40px)");
+    expect(canvas.style.transform).toContain("scale(1)");
+
+    const pinchEvent = new WheelEvent("wheel", { bubbles: true, cancelable: true, ctrlKey: true, deltaY: -40, clientX: 200, clientY: 160 });
+    act(() => {
+      viewport.dispatchEvent(pinchEvent);
+    });
+
+    expect(pinchEvent.defaultPrevented).toBe(true);
+    expect(canvas.style.transform).toContain("scale(1.25)");
+  });
+
+  it("zooms with two touch pointers", () => {
+    render(
+      <MemoryRouter>
+        <DeviceCListView items={items} detailBasePath="/clist/devices" />
+      </MemoryRouter>
+    );
+
+    const viewport = screen.getByTestId("clist-viewport");
+    const canvas = screen.getByTestId("clist-canvas");
+    viewport.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        width: 800,
+        height: 600,
+        right: 800,
+        bottom: 600,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }) as DOMRect;
+
+    dispatchPointerMouseEvent(viewport, "pointerdown", { pointerId: 11, pointerType: "touch", button: 0, clientX: 100, clientY: 120 });
+    dispatchPointerMouseEvent(viewport, "pointerdown", { pointerId: 12, pointerType: "touch", button: 0, clientX: 200, clientY: 120 });
+    dispatchPointerMouseEvent(viewport, "pointermove", { pointerId: 12, pointerType: "touch", clientX: 300, clientY: 120 });
+    dispatchPointerMouseEvent(viewport, "pointerup", { pointerId: 12, pointerType: "touch", clientX: 300, clientY: 120 });
+    dispatchPointerMouseEvent(viewport, "pointerup", { pointerId: 11, pointerType: "touch", clientX: 100, clientY: 120 });
+
+    expect(canvas.style.transform).toContain("scale(2)");
   });
 
   it("fits a large tree into the viewport", () => {

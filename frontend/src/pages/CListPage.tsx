@@ -46,7 +46,7 @@ export default function CListPage() {
           <div className="text-xs uppercase tracking-[0.22em] text-accent/80">CList</div>
           <h1 className="mt-1 text-3xl font-semibold text-textPrimary">CList</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-textSecondary">
-            Standalone device timeline map. Mouse wheel zooms. Hold left, right, or middle button to drag.
+            Standalone device timeline map. Mouse wheel or pinch zooms. Drag or touchpad scroll pans.
           </p>
         </div>
       </section>

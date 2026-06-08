@@ -63,6 +63,11 @@ interface ViewTransform {
   y: number;
 }
 
+interface PointerPoint {
+  x: number;
+  y: number;
+}
+
 const CARD_WIDTH = 220;
 const COLUMN_WIDTH = 280;
 const ITEM_GAP = 126;
@@ -241,12 +246,21 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
   const dragState = useRef({
     active: false,
     moved: false,
+    pointerId: null as number | null,
     startX: 0,
     startY: 0,
     originX: 0,
     originY: 0
   });
+  const activePointers = useRef(new Map<number, PointerPoint>());
+  const pinchState = useRef({
+    active: false,
+    startDistance: 0,
+    anchorWorldX: 0,
+    anchorWorldY: 0
+  });
   const [view, setView] = useState<ViewTransform>({ scale: 1, x: 0, y: 0 });
+  const viewRef = useRef(view);
   const columns = useMemo(() => layoutColumns(buildCListColumns(items)), [items]);
   const canvasWidth = Math.max(760, LEFT_PAD + RIGHT_PAD + Math.max(columns.length - 1, 0) * COLUMN_WIDTH);
   const canvasHeight = Math.max(420, Math.max(...columns.map((column) => column.bottomY), YEAR_Y + 72) + BOTTOM_PAD);
@@ -254,17 +268,33 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
   const firstColumnX = LEFT_PAD;
   const lastColumnX = LEFT_PAD + Math.max(columns.length - 1, 0) * COLUMN_WIDTH;
 
-  function zoomAt(clientX: number, clientY: number, deltaY: number) {
+  function updateView(nextView: ViewTransform | ((current: ViewTransform) => ViewTransform)) {
+    setView((current) => {
+      const next = typeof nextView === "function" ? nextView(current) : nextView;
+      viewRef.current = next;
+      return next;
+    });
+  }
+
+  function minScaleForViewport() {
+    const viewport = viewportRef.current;
+    if (!viewport) return DEFAULT_MIN_SCALE;
+
+    const rect = viewport.getBoundingClientRect();
+    return Math.min(DEFAULT_MIN_SCALE, fitScaleForViewport(rect.width, rect.height, canvasWidth, canvasHeight));
+  }
+
+  function zoomBy(clientX: number, clientY: number, scaleFactor: number) {
     const viewport = viewportRef.current;
     if (!viewport) return;
 
     const rect = viewport.getBoundingClientRect();
     const pointerX = clientX - rect.left;
     const pointerY = clientY - rect.top;
-    const minScale = Math.min(DEFAULT_MIN_SCALE, fitScaleForViewport(rect.width, rect.height, canvasWidth, canvasHeight));
+    const minScale = minScaleForViewport();
 
-    setView((current) => {
-      const nextScale = clamp(current.scale * (deltaY > 0 ? 0.9 : 1.1), minScale, MAX_SCALE);
+    updateView((current) => {
+      const nextScale = clamp(current.scale * scaleFactor, minScale, MAX_SCALE);
       const worldX = (pointerX - current.x) / current.scale;
       const worldY = (pointerY - current.y) / current.scale;
 
@@ -276,28 +306,118 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     });
   }
 
+  function panBy(deltaX: number, deltaY: number) {
+    updateView((current) => ({
+      ...current,
+      x: current.x + deltaX,
+      y: current.y + deltaY
+    }));
+  }
+
+  function pointerEntries() {
+    return Array.from(activePointers.current.entries());
+  }
+
+  function viewportPointFromEvent(event: ReactPointerEvent<HTMLElement>): PointerPoint {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return { x: event.clientX, y: event.clientY };
+    }
+
+    const rect = viewport.getBoundingClientRect();
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    };
+  }
+
+  function startPinch() {
+    const entries = pointerEntries();
+    if (entries.length < 2) return;
+
+    const [, first] = entries[0];
+    const [, second] = entries[1];
+    const centerX = (first.x + second.x) / 2;
+    const centerY = (first.y + second.y) / 2;
+    const distance = Math.hypot(second.x - first.x, second.y - first.y);
+    const currentView = viewRef.current;
+
+    pinchState.current = {
+      active: true,
+      startDistance: Math.max(distance, 1),
+      anchorWorldX: (centerX - currentView.x) / currentView.scale,
+      anchorWorldY: (centerY - currentView.y) / currentView.scale
+    };
+    dragState.current.active = false;
+    dragState.current.moved = true;
+  }
+
+  function applyPinch() {
+    const entries = pointerEntries();
+    if (entries.length < 2) return;
+
+    const [, first] = entries[0];
+    const [, second] = entries[1];
+    const centerX = (first.x + second.x) / 2;
+    const centerY = (first.y + second.y) / 2;
+    const distance = Math.hypot(second.x - first.x, second.y - first.y);
+    const { startDistance, anchorWorldX, anchorWorldY } = pinchState.current;
+    const minScale = minScaleForViewport();
+
+    updateView((current) => {
+      const nextScale = clamp(current.scale * (distance / Math.max(startDistance, 1)), minScale, MAX_SCALE);
+      return {
+        scale: nextScale,
+        x: centerX - anchorWorldX * nextScale,
+        y: centerY - anchorWorldY * nextScale
+      };
+    });
+
+    pinchState.current.startDistance = Math.max(distance, 1);
+  }
+
   function handlePointerDown(event: ReactPointerEvent<HTMLElement>) {
     event.stopPropagation();
-    if (![0, 1, 2].includes(event.button)) return;
+    if (event.pointerType === "mouse" && ![0, 1, 2].includes(event.button)) return;
 
-    if (event.button !== 0) {
+    if (event.pointerType === "mouse" && event.button !== 0) {
       event.preventDefault();
     }
     event.currentTarget.setPointerCapture?.(event.pointerId);
+    activePointers.current.set(event.pointerId, viewportPointFromEvent(event));
+
+    if (activePointers.current.size >= 2) {
+      event.preventDefault();
+      startPinch();
+      return;
+    }
+
     dragState.current = {
       active: true,
       moved: false,
+      pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originX: view.x,
-      originY: view.y
+      originX: viewRef.current.x,
+      originY: viewRef.current.y
     };
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLElement>) {
     event.stopPropagation();
+    if (activePointers.current.has(event.pointerId)) {
+      activePointers.current.set(event.pointerId, viewportPointFromEvent(event));
+    }
+
+    if (pinchState.current.active && activePointers.current.size >= 2) {
+      event.preventDefault();
+      dragState.current.moved = true;
+      applyPinch();
+      return;
+    }
+
     const current = dragState.current;
-    if (!current.active) return;
+    if (!current.active || current.pointerId !== event.pointerId) return;
 
     const deltaX = event.clientX - current.startX;
     const deltaY = event.clientY - current.startY;
@@ -305,7 +425,7 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
       current.moved = true;
     }
 
-    setView((previous) => ({
+    updateView((previous) => ({
       ...previous,
       x: current.originX + deltaX,
       y: current.originY + deltaY
@@ -317,11 +437,36 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     if (dragState.current.active) {
       event.currentTarget.releasePointerCapture?.(event.pointerId);
     }
-    dragState.current.active = false;
+    activePointers.current.delete(event.pointerId);
+
+    if (pinchState.current.active) {
+      dragState.current.moved = true;
+      if (activePointers.current.size === 1) {
+        const [[pointerId, point]] = pointerEntries();
+        dragState.current = {
+          active: true,
+          moved: true,
+          pointerId,
+          startX: point.x,
+          startY: point.y,
+          originX: viewRef.current.x,
+          originY: viewRef.current.y
+        };
+      } else {
+        dragState.current.active = false;
+      }
+      pinchState.current.active = false;
+      return;
+    }
+
+    if (dragState.current.pointerId === event.pointerId) {
+      dragState.current.active = false;
+      dragState.current.pointerId = null;
+    }
   }
 
   function handleResetView() {
-    setView({ scale: 1, x: 0, y: 0 });
+    updateView({ scale: 1, x: 0, y: 0 });
   }
 
   function handleFitView() {
@@ -330,7 +475,7 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
 
     const rect = viewport.getBoundingClientRect();
     const nextScale = fitScaleForViewport(rect.width, rect.height, canvasWidth, canvasHeight);
-    setView({
+    updateView({
       scale: nextScale,
       x: Math.max(FIT_PADDING / 2, (rect.width - canvasWidth * nextScale) / 2),
       y: Math.max(FIT_PADDING / 2, (rect.height - canvasHeight * nextScale) / 2)
@@ -353,13 +498,30 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
   };
 
   useEffect(() => {
+    viewRef.current = view;
+  }, [view]);
+
+  useEffect(() => {
     const viewport = viewportRef.current;
     if (!viewport) return undefined;
 
     function handleNativeWheel(event: WheelEvent) {
       event.preventDefault();
       event.stopPropagation();
-      zoomAt(event.clientX, event.clientY, event.deltaY);
+
+      if (event.ctrlKey || event.metaKey) {
+        zoomBy(event.clientX, event.clientY, clamp(Math.exp(-event.deltaY * 0.01), 0.8, 1.25));
+        return;
+      }
+
+      const isPixelWheel = event.deltaMode === 0;
+      const looksLikeTouchpadPan = isPixelWheel && (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 80);
+      if (looksLikeTouchpadPan) {
+        panBy(-event.deltaX, -event.deltaY);
+        return;
+      }
+
+      zoomBy(event.clientX, event.clientY, event.deltaY > 0 ? 0.9 : 1.1);
     }
 
     viewport.addEventListener("wheel", handleNativeWheel, { passive: false });
