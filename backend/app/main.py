@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import bootstrap, dashboard, data, devices, leaderboards, media, wishlist
+from app.api.routes import bootstrap, dashboard, data, devices, leaderboards, media, settings as settings_routes, wishlist
 from app.core.config import get_settings
 from app.db.init_db import init_db, seed_if_needed
 from app.db.session import SessionLocal
@@ -45,6 +45,7 @@ app.include_router(media.router, prefix=settings.api_v1_prefix)
 app.include_router(bootstrap.router, prefix=settings.api_v1_prefix)
 app.include_router(leaderboards.router, prefix=settings.api_v1_prefix)
 app.include_router(data.router, prefix=settings.api_v1_prefix)
+app.include_router(settings_routes.router, prefix=settings.api_v1_prefix)
 app.include_router(wishlist.router, prefix=settings.api_v1_prefix)
 
 

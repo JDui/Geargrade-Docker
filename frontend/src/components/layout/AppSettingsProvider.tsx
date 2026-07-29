@@ -4,8 +4,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
+
+import { fetchAppSettings, updateAppSettings, type AppSettingsApi } from "../../api/settings";
 
 export type MotionMode = "system" | "on" | "reduced";
 export type ContentWidth = "compact" | "default" | "wide";
@@ -109,6 +112,16 @@ function readInitialSettings(): AppSettings {
   };
 }
 
+function hasCachedSettings(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return Boolean(
+    window.localStorage.getItem(SETTINGS_STORAGE_KEY) || window.localStorage.getItem(LEGACY_SIMPLIFIED_MODE_KEY)
+  );
+}
+
 function readPrefersReducedMotion() {
   if (typeof window === "undefined") {
     return false;
@@ -116,12 +129,39 @@ function readPrefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+function fromApiSettings(value: AppSettingsApi): AppSettings {
+  return normalizeSettings({
+    simplifiedMode: value.simplified_mode,
+    motionMode: value.motion_mode,
+    contentWidth: value.content_width,
+    density: value.density,
+    showBackgroundGrid: value.show_background_grid,
+    defaultIconSize: value.default_icon_size
+  });
+}
+
+function toApiSettings(value: AppSettings): AppSettingsApi {
+  return {
+    simplified_mode: value.simplifiedMode,
+    motion_mode: value.motionMode,
+    content_width: value.contentWidth,
+    density: value.density,
+    show_background_grid: value.showBackgroundGrid,
+    default_icon_size: value.defaultIconSize
+  };
+}
+
 export function AppSettingsProvider({ children }: PropsWithChildren) {
   const [settings, setSettings] = useState(readInitialSettings);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const settingsChangedBeforeLoad = useRef(false);
+  const hasCachedSettingsRef = useRef(hasCachedSettings());
+  const settingsWriteQueue = useRef(Promise.resolve());
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(readPrefersReducedMotion);
   const reduceMotion = settings.motionMode === "reduced" || (settings.motionMode === "system" && prefersReducedMotion);
 
   function updateSetting<Key extends keyof AppSettings>(key: Key, value: AppSettings[Key]) {
+    settingsChangedBeforeLoad.current = true;
     setSettings((current) => ({
       ...current,
       [key]: value
@@ -129,9 +169,36 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
   }
 
   useEffect(() => {
+    let active = true;
+
+    fetchAppSettings()
+      .then((remoteSettings) => {
+        if (active && !settingsChangedBeforeLoad.current && !hasCachedSettingsRef.current) {
+          setSettings(fromApiSettings(remoteSettings));
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) {
+          setSettingsReady(true);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     window.localStorage.setItem(LEGACY_SIMPLIFIED_MODE_KEY, settings.simplifiedMode ? "true" : "false");
-  }, [settings]);
+    if (settingsReady) {
+      settingsWriteQueue.current = settingsWriteQueue.current
+        .catch(() => undefined)
+        .then(() => updateAppSettings(toApiSettings(settings)))
+        .then(() => undefined);
+    }
+  }, [settings, settingsReady]);
 
   useEffect(() => {
     const root = document.documentElement;

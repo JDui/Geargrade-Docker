@@ -14,21 +14,19 @@ import {
   type DeviceCategory,
   type DeviceListItem,
   type DeviceStatus,
+  type WishlistDeviceListItem,
   type RatingLabel
 } from "../../types/device";
 import { formatCurrency, formatDate } from "../../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../../utils/device";
 
-interface DeviceCListViewProps {
-  items: DeviceListItem[];
-  detailBasePath?: string;
-}
-
 interface CategoryGroup {
   key: DeviceCategory;
   label: string;
-  items: DeviceListItem[];
+  items: CListItem[];
 }
+
+type CListItem = DeviceListItem | WishlistDeviceListItem;
 
 interface CListColumn {
   key: string;
@@ -37,7 +35,7 @@ interface CListColumn {
 }
 
 interface PositionedDevice {
-  device: DeviceListItem;
+  device: CListItem;
   y: number;
 }
 
@@ -138,13 +136,13 @@ function compareByPurchaseDate(left: DeviceListItem, right: DeviceListItem): num
   return left.name.localeCompare(right.name);
 }
 
-function scoreText(device: DeviceListItem): string {
+function scoreText(device: CListItem): string {
   if (isFeelingScore(device.score)) return "FEEL";
   if (isUnratedScore(device.score)) return "N/A";
   return String(device.score);
 }
 
-function titleClass(device: DeviceListItem): string {
+function titleClass(device: CListItem): string {
   if (device.rating_label) {
     return ratingPalette[device.rating_label];
   }
@@ -157,8 +155,8 @@ function titleClass(device: DeviceListItem): string {
   return "text-textPrimary";
 }
 
-function buildCategoryGroups(items: DeviceListItem[]): CategoryGroup[] {
-  const groups = new Map<DeviceCategory, DeviceListItem[]>();
+function buildCategoryGroups(items: CListItem[]): CategoryGroup[] {
+  const groups = new Map<DeviceCategory, CListItem[]>();
 
   for (const item of items) {
     const current = groups.get(item.category) ?? [];
@@ -169,7 +167,12 @@ function buildCategoryGroups(items: DeviceListItem[]): CategoryGroup[] {
   return CATEGORY_ORDER.filter((category) => groups.has(category)).map((category) => ({
     key: category,
     label: CATEGORY_LABELS[category],
-    items: (groups.get(category) ?? []).slice().sort(compareByPurchaseDate)
+    items: (groups.get(category) ?? []).slice().sort((left, right) => {
+      if ("purchase_date" in left && "purchase_date" in right) {
+        return compareByPurchaseDate(left, right);
+      }
+      return left.name.localeCompare(right.name);
+    })
   }));
 }
 
@@ -196,7 +199,7 @@ function buildYearGroups(items: DeviceListItem[]): CListColumn[] {
     }));
 }
 
-function buildCListColumns(items: DeviceListItem[]): CListColumn[] {
+function buildCListColumns(items: DeviceListItem[], wishlistItems: WishlistDeviceListItem[]): CListColumn[] {
   const holdingItems = items.filter((item) => item.status === "holding");
 
   return [
@@ -205,7 +208,12 @@ function buildCListColumns(items: DeviceListItem[]): CListColumn[] {
       label: "持有设备",
       categoryGroups: buildCategoryGroups(holdingItems)
     },
-    ...buildYearGroups(items)
+    ...buildYearGroups(items),
+    {
+      key: "wishlist",
+      label: "心愿池",
+      categoryGroups: buildCategoryGroups(wishlistItems)
+    }
   ];
 }
 
@@ -240,7 +248,17 @@ function layoutColumns(columns: CListColumn[]): PositionedColumn[] {
   });
 }
 
-export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCListViewProps) {
+interface DeviceCListViewProps {
+  items: DeviceListItem[];
+  wishlistItems?: WishlistDeviceListItem[];
+  detailBasePath?: string;
+}
+
+function isDeviceItem(device: CListItem): device is DeviceListItem {
+  return "status" in device;
+}
+
+export function DeviceCListView({ items, wishlistItems = [], detailBasePath = "/devices" }: DeviceCListViewProps) {
   const navigate = useNavigate();
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({
@@ -261,7 +279,7 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
   });
   const [view, setView] = useState<ViewTransform>({ scale: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
-  const columns = useMemo(() => layoutColumns(buildCListColumns(items)), [items]);
+  const columns = useMemo(() => layoutColumns(buildCListColumns(items, wishlistItems)), [items, wishlistItems]);
   const canvasWidth = Math.max(760, LEFT_PAD + RIGHT_PAD + Math.max(columns.length - 1, 0) * COLUMN_WIDTH);
   const canvasHeight = Math.max(420, Math.max(...columns.map((column) => column.bottomY), YEAR_Y + 72) + BOTTOM_PAD);
   const rootX = canvasWidth / 2;
@@ -482,12 +500,12 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
     });
   }
 
-  function handleNodeClick(deviceId: number) {
+  function handleNodeClick(deviceId: number, wishlist: boolean) {
     if (dragState.current.moved) {
       dragState.current.moved = false;
       return;
     }
-    navigate(`${detailBasePath}/${deviceId}`);
+    navigate(`${wishlist ? "/wishlist/devices" : detailBasePath}/${deviceId}`);
   }
 
   const transformStyle: CSSProperties = {
@@ -653,12 +671,12 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
                               data-testid={`clist-device-icon-${column.key}-${device.id}`}
                               className="absolute z-20 h-5 w-5 rounded-full border border-accent/60 bg-panel shadow-sm transition hover:border-accent hover:bg-accent/15 focus:outline-none focus:ring-2 focus:ring-accent/45"
                               style={{ left: iconX, top: item.y + 22, transform: "translate(-50%, -50%)" }}
-                              aria-label={`Open ${device.name} details from ${column.label} / ${category.label}`}
+                              aria-label={`打开${device.name}详情，${column.label}/${category.label}`}
                               onPointerDown={handlePointerDown}
                               onPointerMove={handlePointerMove}
                               onPointerUp={handlePointerUp}
                               onPointerCancel={handlePointerUp}
-                              onClick={() => handleNodeClick(device.id)}
+                              onClick={() => handleNodeClick(device.id, column.key === "wishlist")}
                             >
                               <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent" />
                             </button>
@@ -671,7 +689,7 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
                               onPointerMove={handlePointerMove}
                               onPointerUp={handlePointerUp}
                               onPointerCancel={handlePointerUp}
-                              onClick={() => handleNodeClick(device.id)}
+                              onClick={() => handleNodeClick(device.id, column.key === "wishlist")}
                             >
                               <span className={`block truncate text-[12px] font-semibold leading-5 ${titleClass(device)}`}>
                                 {formatDeviceTitle(device)}
@@ -680,9 +698,13 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
                                 {device.brand} / {CATEGORY_LABELS[device.category]}
                               </span>
                               <span className="mt-1 flex flex-wrap gap-1.5">
-                                <span className={`rounded-sm border px-1.5 py-0.5 text-[9px] ${statusPalette[device.status]}`}>
-                                  {STATUS_LABELS[device.status]}
-                                </span>
+                                {isDeviceItem(device) ? (
+                                  <span className={`rounded-sm border px-1.5 py-0.5 text-[9px] ${statusPalette[device.status]}`}>
+                                    {STATUS_LABELS[device.status]}
+                                  </span>
+                                ) : (
+                                  <span className="rounded-sm border border-accent/50 px-1.5 py-0.5 text-[9px] text-accent">心愿池</span>
+                                )}
                                 <span className="rounded-sm border border-line px-1.5 py-0.5 text-[9px] text-textSecondary">
                                   {scoreText(device)}
                                 </span>
@@ -692,9 +714,11 @@ export function DeviceCListView({ items, detailBasePath = "/devices" }: DeviceCL
                                   </span>
                                 ) : null}
                               </span>
-                              <span className="mt-1 block truncate text-[10px] leading-4 text-textSecondary">
-                                {formatDate(device.purchase_date)} / {formatCurrency(device.purchase_price)}
-                              </span>
+                              {isDeviceItem(device) ? (
+                                <span className="mt-1 block truncate text-[10px] leading-4 text-textSecondary">
+                                  {formatDate(device.purchase_date)} / {formatCurrency(device.purchase_price)}
+                                </span>
+                              ) : null}
                             </button>
                           </div>
                         );

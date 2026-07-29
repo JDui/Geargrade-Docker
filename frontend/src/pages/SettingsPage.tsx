@@ -12,12 +12,14 @@ function ToggleRow({
   title,
   description,
   checked,
-  onChange
+  onChange,
+  stateInAccessibleName = true
 }: {
   title: string;
   description: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  stateInAccessibleName?: boolean;
 }) {
   return (
     <div className="settings-row">
@@ -29,6 +31,7 @@ function ToggleRow({
         <input
           type="checkbox"
           className="h-4 w-4 accent-[#5cc8ff]"
+          aria-label={stateInAccessibleName ? undefined : title}
           checked={checked}
           onChange={(event) => onChange(event.target.checked)}
         />
@@ -155,6 +158,7 @@ export default function SettingsPage() {
           description="关闭后移除页面背景网格，界面更安静。"
           checked={showBackgroundGrid}
           onChange={setShowBackgroundGrid}
+          stateInAccessibleName={false}
         />
         <SegmentedRow<DefaultIconSize>
           title="默认图标大小"

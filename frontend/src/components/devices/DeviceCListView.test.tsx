@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
 import { DeviceCListView } from "./DeviceCListView";
-import type { DeviceListItem } from "../../types/device";
+import type { DeviceListItem, WishlistDeviceListItem } from "../../types/device";
 
 const items: DeviceListItem[] = [
   {
@@ -60,6 +60,29 @@ const items: DeviceListItem[] = [
   }
 ];
 
+const wishlistItems: WishlistDeviceListItem[] = [
+  {
+    id: 9,
+    name: "GR IIIx",
+    brand: "Ricoh",
+    category: "camera_body",
+    mount_system_key: null,
+    mount_system_custom: null,
+    mount_system_label: null,
+    score: 90,
+    rating_label: "excellent",
+    acquisition_iteration: 1,
+    tags: ["心愿池"],
+    image_source_type: null,
+    image_original_url: null,
+    image_storage_path: null,
+    image_storage_name: null,
+    image_url: null,
+    created_at: "2026-01-01T00:00:00",
+    updated_at: "2026-01-01T00:00:00"
+  }
+];
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{location.pathname}</div>;
@@ -86,7 +109,7 @@ describe("DeviceCListView", () => {
             path="/clist/*"
             element={
               <>
-                <DeviceCListView items={items} detailBasePath="/clist/devices" />
+                <DeviceCListView items={items} wishlistItems={wishlistItems} detailBasePath="/clist/devices" />
                 <LocationProbe />
               </>
             }
@@ -99,6 +122,9 @@ describe("DeviceCListView", () => {
     expect(screen.getByText("持有设备")).toBeInTheDocument();
     expect(screen.getByText("2020")).toBeInTheDocument();
     expect(screen.getByText("2023")).toBeInTheDocument();
+    const wishlistLabels = screen.getAllByText("心愿池");
+    expect(wishlistLabels[0]).toBeInTheDocument();
+    expect(screen.getByText("2023").compareDocumentPosition(wishlistLabels[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("A7M3")).toBeInTheDocument();
     expect(screen.getAllByText(/X-T5/)).toHaveLength(2);
     expect(screen.getByTestId("clist-category-holding-camera_body")).toBeInTheDocument();
