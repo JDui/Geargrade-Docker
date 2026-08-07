@@ -1001,17 +1001,18 @@ body {
 .clist-rainbow-border {
   border-color: transparent;
   background-image:
-    linear-gradient(rgb(var(--color-panel) / 0.9), rgb(var(--color-panel) / 0.9)) padding-box,
+    linear-gradient(rgb(var(--color-panel) / 0.9), rgb(var(--color-panel) / 0.9)),
     linear-gradient(
-        120deg,
-        #ff5f6d 0%,
-        #ffc34d 22%,
-        #7ce495 44%,
-        #5aa7ff 66%,
-        #b388eb 88%,
-        #ff5f6d 100%
-      )
-      border-box;
+      120deg,
+      #ff5f6d 0%,
+      #ffc34d 22%,
+      #7ce495 44%,
+      #5aa7ff 66%,
+      #b388eb 88%,
+      #ff5f6d 100%
+    );
+  background-origin: padding-box, border-box;
+  background-clip: padding-box, border-box;
 }
 
 .clist-rainbow-border:hover {
