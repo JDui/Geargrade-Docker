@@ -4,7 +4,7 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.enums import DeviceStatus, rating_label_from_score
+from app.core.enums import DeviceCategory, DeviceStatus, rating_label_from_score
 from app.models.device import Device
 from app.schemas.device import SortOrder
 from app.schemas.leaderboard import (
@@ -32,13 +32,21 @@ def _calendar_month_delta(start_date: date, end_date: date) -> int:
     return max((end_date.year - start_date.year) * 12 + end_date.month - start_date.month, 0)
 
 
+def _category_filter(category: DeviceCategory | None):
+    return [] if category is None else [Device.category == category]
+
+
 def get_holding_duration_leaderboard(
     session: Session,
     sort_order: SortOrder = "desc",
     duration_unit: DurationUnit = "days",
+    category: DeviceCategory | None = None,
 ) -> HoldingDurationResponse:
     today = date.today()
-    devices = session.scalars(select(Device).where(Device.purchase_date.is_not(None))).all()
+    devices = session.scalars(
+        select(Device)
+        .where(Device.purchase_date.is_not(None), *_category_filter(category))
+    ).all()
     items: list[HoldingDurationItem] = []
 
     for device in devices:
@@ -80,8 +88,14 @@ def get_holding_duration_leaderboard(
     return HoldingDurationResponse(items=_rank_items(items))
 
 
-def get_score_leaderboard(session: Session, sort_order: SortOrder = "desc") -> ScoreLeaderboardResponse:
-    devices = session.scalars(select(Device).where(Device.score > 0)).all()
+def get_score_leaderboard(
+    session: Session,
+    sort_order: SortOrder = "desc",
+    category: DeviceCategory | None = None,
+) -> ScoreLeaderboardResponse:
+    devices = session.scalars(
+        select(Device).where(Device.score > 0, *_category_filter(category))
+    ).all()
     if sort_order == "desc":
         devices = sorted(devices, key=_score_ranking_key)
     else:
@@ -110,12 +124,17 @@ def get_score_leaderboard(session: Session, sort_order: SortOrder = "desc") -> S
     return ScoreLeaderboardResponse(items=items)
 
 
-def get_finance_leaderboard(session: Session, sort_order: SortOrder = "desc") -> FinanceLeaderboardResponse:
+def get_finance_leaderboard(
+    session: Session,
+    sort_order: SortOrder = "desc",
+    category: DeviceCategory | None = None,
+) -> FinanceLeaderboardResponse:
     devices = session.scalars(
         select(Device).where(
             Device.status == DeviceStatus.SOLD,
             Device.purchase_price.is_not(None),
             Device.sale_price.is_not(None),
+            *_category_filter(category),
         )
     ).all()
 

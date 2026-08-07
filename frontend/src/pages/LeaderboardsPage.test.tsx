@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -77,7 +77,7 @@ describe("LeaderboardsPage", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.fetchScoreLeaderboard).toHaveBeenCalledWith("desc");
+      expect(mocks.fetchScoreLeaderboard).toHaveBeenCalledWith("desc", "");
     });
 
     await screen.findByText("TOP #1");
@@ -89,6 +89,30 @@ describe("LeaderboardsPage", () => {
     expect(top1Card).toHaveClass("order-1", "lg:order-2");
     expect(top2Card).toHaveClass("order-2", "lg:order-1");
     expect(top3Card).toHaveClass("order-3", "lg:order-3");
+  });
+
+  it("filters leaderboard by category via the category pills", async () => {
+    mocks.fetchScoreLeaderboard.mockResolvedValue({ items: [] });
+
+    render(
+      <MemoryRouter initialEntries={["/leaderboards?tab=score&sort_order=desc"]}>
+        <AppSettingsProvider>
+          <LeaderboardsPage />
+        </AppSettingsProvider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(mocks.fetchScoreLeaderboard).toHaveBeenCalledWith("desc", "");
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "镜头" }));
+
+    await waitFor(() => {
+      expect(mocks.fetchScoreLeaderboard).toHaveBeenCalledWith("desc", "lens");
+    });
+
+    expect(screen.getByRole("button", { name: "镜头" }).className).toContain("button-primary");
   });
 
   it("uses month durations in simplified mode", async () => {
@@ -119,7 +143,7 @@ describe("LeaderboardsPage", () => {
     );
 
     await waitFor(() => {
-      expect(mocks.fetchHoldingDurationLeaderboard).toHaveBeenCalledWith("desc", "months");
+      expect(mocks.fetchHoldingDurationLeaderboard).toHaveBeenCalledWith("desc", "months", "");
     });
 
     expect(await screen.findByText("2 个月")).toBeInTheDocument();

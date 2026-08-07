@@ -118,7 +118,11 @@ describe("DeviceCListView", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText("CList Map")).toBeInTheDocument();
+    expect(screen.getByText("CList MAP")).toBeInTheDocument();
+    expect(screen.queryByText("Timeline tree")).not.toBeInTheDocument();
+    expect(screen.getByTestId("clist-device-holding-2")).toHaveClass("clist-rainbow-border");
+    expect(screen.getByTestId("clist-device-year-2023-2")).toHaveClass("clist-rainbow-border");
+    expect(screen.getByTestId("clist-device-year-2020-1")).not.toHaveClass("clist-rainbow-border");
     expect(screen.getByText("持有设备")).toBeInTheDocument();
     expect(screen.getByText("2020")).toBeInTheDocument();
     expect(screen.getByText("2023")).toBeInTheDocument();

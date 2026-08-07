@@ -70,6 +70,52 @@ def test_leaderboards(session):
     assert finance.items[0].profit_value == 600
 
 
+def test_leaderboards_can_filter_by_category(session):
+    settings = Settings(media_root="data/media")
+    create_device(
+        session,
+        DeviceCreate(
+            name="Body High Score",
+            brand="Alpha",
+            category=DeviceCategory.CAMERA_BODY,
+            status=DeviceStatus.HOLDING,
+            score=90,
+            acquisition_iteration=1,
+            review_detail="body",
+            purchase_date="2024-01-01",
+        ),
+        settings,
+    )
+    create_device(
+        session,
+        DeviceCreate(
+            name="Lens Lower Score",
+            brand="Beta",
+            category=DeviceCategory.LENS,
+            status=DeviceStatus.HOLDING,
+            score=80,
+            acquisition_iteration=1,
+            review_detail="lens",
+            purchase_date="2024-02-01",
+        ),
+        settings,
+    )
+
+    score_all = get_score_leaderboard(session, sort_order="desc")
+    score_body = get_score_leaderboard(session, sort_order="desc", category=DeviceCategory.CAMERA_BODY)
+
+    assert [item.name for item in score_all.items] == ["Body High Score", "Lens Lower Score"]
+    assert [item.name for item in score_body.items] == ["Body High Score"]
+    assert all(item.rank == 1 for item in score_body.items)
+
+    holding_lens = get_holding_duration_leaderboard(
+        session,
+        sort_order="desc",
+        category=DeviceCategory.LENS,
+    )
+    assert [item.name for item in holding_lens.items] == ["Lens Lower Score"]
+
+
 def test_holding_duration_leaderboard_can_sort_by_calendar_months(session):
     settings = Settings(media_root="data/media")
     create_device(

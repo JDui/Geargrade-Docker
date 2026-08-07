@@ -552,10 +552,7 @@ export function DeviceCListView({ items, wishlistItems = [], detailBasePath = "/
     <section className="panel overflow-hidden">
       <div className="border-b border-line bg-panelAlt/45 px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-accent/85">CList Map</div>
-            <h3 className="mt-1 text-lg font-semibold text-textPrimary">Timeline tree</h3>
-          </div>
+          <h3 className="text-lg font-semibold tracking-wide text-textPrimary">CList MAP</h3>
           <div className="flex items-center gap-2">
             <div className="rounded-full border border-line bg-panel px-3 py-1 text-xs text-textSecondary">
               {items.length} nodes / {Math.round(view.scale * 100)}%
@@ -683,7 +680,11 @@ export function DeviceCListView({ items, wishlistItems = [], detailBasePath = "/
                             <button
                               type="button"
                               data-testid={`clist-device-${column.key}-${device.id}`}
-                              className="group absolute min-h-[5.7rem] rounded-md border border-line bg-panel/90 px-3 py-2 text-left shadow-sm transition hover:border-accent hover:bg-panel"
+                              className={`group absolute min-h-[5.7rem] rounded-md border bg-panel/90 px-3 py-2 text-left shadow-sm transition hover:bg-panel ${
+                                isDeviceItem(device) && device.status === "holding"
+                                  ? "clist-rainbow-border"
+                                  : "border-line hover:border-accent"
+                              }`}
                               style={{ left: column.x - CARD_WIDTH / 2, top: item.y, width: CARD_WIDTH }}
                               onPointerDown={handlePointerDown}
                               onPointerMove={handlePointerMove}

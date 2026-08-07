@@ -9,6 +9,8 @@ import {
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
 import { useAppSettings } from "../components/layout/AppSettingsProvider";
 import {
+  CATEGORY_LABELS,
+  type DeviceCategory,
   type DurationUnit,
   type FinanceLeaderboardItem,
   type HoldingDurationItem,
@@ -30,6 +32,7 @@ type RankedEntry = {
 
 const VALID_TABS: LeaderboardTab[] = ["holding-duration", "score", "finance"];
 const VALID_SORTS: SortOrder[] = ["desc", "asc"];
+const VALID_CATEGORIES = Object.keys(CATEGORY_LABELS) as DeviceCategory[];
 
 function tabLabel(tab: LeaderboardTab) {
   return {
@@ -164,12 +167,16 @@ export default function LeaderboardsPage() {
 
   const rawTab = searchParams.get("tab");
   const rawSort = searchParams.get("sort_order");
+  const rawCategory = searchParams.get("category");
   const tab: LeaderboardTab = VALID_TABS.includes(rawTab as LeaderboardTab)
     ? (rawTab as LeaderboardTab)
     : "score";
   const sortOrder: SortOrder = VALID_SORTS.includes(rawSort as SortOrder)
     ? (rawSort as SortOrder)
     : "desc";
+  const category: DeviceCategory | "" = VALID_CATEGORIES.includes(rawCategory as DeviceCategory)
+    ? (rawCategory as DeviceCategory)
+    : "";
 
   const [holdingItems, setHoldingItems] = useState<HoldingDurationItem[]>([]);
   const [scoreItems, setScoreItems] = useState<ScoreLeaderboardItem[]>([]);
@@ -189,24 +196,28 @@ export default function LeaderboardsPage() {
       normalized.set("sort_order", sortOrder);
       changed = true;
     }
+    if (normalized.get("category") !== category) {
+      normalized.set("category", category);
+      changed = true;
+    }
 
     if (changed) {
       setSearchParams(normalized, { replace: true });
     }
-  }, [searchParams, setSearchParams, sortOrder, tab]);
+  }, [category, searchParams, setSearchParams, sortOrder, tab]);
 
   useEffect(() => {
     setError(null);
 
     const loader =
       tab === "holding-duration"
-        ? fetchHoldingDurationLeaderboard(sortOrder, durationUnit).then((result) => setHoldingItems(result.items))
+        ? fetchHoldingDurationLeaderboard(sortOrder, durationUnit, category).then((result) => setHoldingItems(result.items))
         : tab === "score"
-          ? fetchScoreLeaderboard(sortOrder).then((result) => setScoreItems(result.items))
-          : fetchFinanceLeaderboard(sortOrder).then((result) => setFinanceItems(result.items));
+          ? fetchScoreLeaderboard(sortOrder, category).then((result) => setScoreItems(result.items))
+          : fetchFinanceLeaderboard(sortOrder, category).then((result) => setFinanceItems(result.items));
 
     loader.catch((err: Error) => setError(err.message));
-  }, [durationUnit, tab, sortOrder, refreshToken]);
+  }, [category, durationUnit, tab, sortOrder, refreshToken]);
 
   const activeItems =
     tab === "holding-duration"
@@ -224,13 +235,20 @@ export default function LeaderboardsPage() {
     navigate(`/leaderboards/devices/${deviceId}${currentSearch ? `?${currentSearch}` : ""}`);
   }
 
-  function updateParams(next: Partial<{ tab: LeaderboardTab; sort_order: SortOrder }>) {
+  function updateParams(next: Partial<{ tab: LeaderboardTab; sort_order: SortOrder; category: DeviceCategory | "" }>) {
     const params = new URLSearchParams(searchParams);
     if (next.tab) {
       params.set("tab", next.tab);
     }
     if (next.sort_order) {
       params.set("sort_order", next.sort_order);
+    }
+    if (typeof next.category !== "undefined") {
+      if (next.category) {
+        params.set("category", next.category);
+      } else {
+        params.delete("category");
+      }
     }
     setSearchParams(params);
   }
@@ -276,6 +294,27 @@ export default function LeaderboardsPage() {
                 onClick={() => updateParams({ tab: candidate })}
               >
                 {tabLabel(candidate)}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">
+            <span className="text-xs uppercase tracking-[0.2em] text-textSecondary">类别</span>
+            <button
+              type="button"
+              className={category === "" ? "button-primary px-3 py-1.5 text-xs" : "button-secondary px-3 py-1.5 text-xs"}
+              onClick={() => updateParams({ category: "" })}
+            >
+              全部
+            </button>
+            {VALID_CATEGORIES.map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                className={category === candidate ? "button-primary px-3 py-1.5 text-xs" : "button-secondary px-3 py-1.5 text-xs"}
+                onClick={() => updateParams({ category: candidate })}
+              >
+                {CATEGORY_LABELS[candidate]}
               </button>
             ))}
           </div>

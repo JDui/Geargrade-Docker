@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMatch } from "react-router-dom";
 
 import { fetchDevices } from "../api/devices";
+import { CategoryDrawerList } from "../components/devices/CategoryDrawerList";
 import { DeviceCard } from "../components/devices/DeviceCard";
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
 import { DeviceTable } from "../components/devices/DeviceTable";
@@ -23,6 +24,14 @@ export default function ArchivePage() {
 
   const deferredSearch = useDeferredValue(filters.search);
   const effectiveFilters = useMemo(() => ({ ...filters, search: deferredSearch }), [filters, deferredSearch]);
+
+  const noFiltersActive =
+    !filters.search.trim() &&
+    !filters.category &&
+    !filters.status &&
+    !filters.rating &&
+    !filters.feelingOnly &&
+    !filters.purchaseYear.trim();
 
   const availablePurchaseYears = useMemo(() => {
     const years = (summary?.purchase_years ?? []).map((item) => item.year);
@@ -115,11 +124,15 @@ export default function ArchivePage() {
 
       {!loading && devices.length ? (
         viewMode === "cards" ? (
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {devices.map((device) => (
-              <DeviceCard key={device.id} device={device} detailBasePath="/archive/devices" />
-            ))}
-          </section>
+          noFiltersActive ? (
+            <CategoryDrawerList items={devices} detailBasePath="/archive/devices" />
+          ) : (
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {devices.map((device) => (
+                <DeviceCard key={device.id} device={device} detailBasePath="/archive/devices" />
+              ))}
+            </section>
+          )
         ) : (
           <DeviceTable
             items={devices}

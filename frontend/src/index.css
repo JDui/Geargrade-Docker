@@ -998,6 +998,26 @@ body {
   color: rgb(var(--color-text-primary));
 }
 
+.clist-rainbow-border {
+  border-color: transparent;
+  background-image:
+    linear-gradient(rgb(var(--color-panel) / 0.9), rgb(var(--color-panel) / 0.9)) padding-box,
+    linear-gradient(
+        120deg,
+        #ff5f6d 0%,
+        #ffc34d 22%,
+        #7ce495 44%,
+        #5aa7ff 66%,
+        #b388eb 88%,
+        #ff5f6d 100%
+      )
+      border-box;
+}
+
+.clist-rainbow-border:hover {
+  border-color: transparent;
+}
+
 .score-hero-card {
   position: relative;
   display: flex;

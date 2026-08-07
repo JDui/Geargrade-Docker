@@ -53,13 +53,6 @@ export default function CListPage() {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <section className="flex items-center justify-between gap-4">
-        <div>
-          <div className="text-xs uppercase tracking-[0.22em] text-accent/80">CList</div>
-          <h1 className="mt-1 text-3xl font-semibold text-textPrimary">CList</h1>
-        </div>
-      </section>
-
       {error ? <div className="rounded-2xl border border-danger/40 bg-danger/10 p-4 text-danger">{error}</div> : null}
       {loading ? <div className="panel p-5 text-textSecondary">Loading CList...</div> : null}
 
