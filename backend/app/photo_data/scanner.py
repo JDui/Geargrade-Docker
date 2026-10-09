@@ -91,9 +91,12 @@ def _file_iterator(root: str):
 
 def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: bool) -> None:
     from . import service as s
-    from .db import connect
+    from .db import connect, database_path
 
     with connect() as db:
+        stage_path: Path | None = None
+        stage_table = "scan_seen"
+        v2 = db.execute("PRAGMA user_version").fetchone()[0] >= 2
         progress: dict[str, Any] = {
             "seen": 0, "extracted": 0, "unchanged": 0, "failed": 0, "removed": 0,
             "processed": 0, "directories_seen": 0, "total_candidates": 0,
@@ -118,6 +121,18 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
             return bool(item and item[0])
 
         try:
+            if v2:
+                stage_path = database_path().with_name(
+                    database_path().stem + ".scan-stage-" + run_id + ".sqlite"
+                )
+                db.execute("ATTACH DATABASE ? AS scan_stage", (str(stage_path),))
+                db.execute("PRAGMA scan_stage.journal_mode=DELETE")
+                db.execute("""CREATE TABLE scan_stage.scan_seen (
+                  run_id TEXT NOT NULL, source_id TEXT NOT NULL, relpath TEXT NOT NULL,
+                  payload TEXT NOT NULL, PRIMARY KEY(run_id,source_id,relpath)
+                )""")
+                stage_table = "scan_stage.scan_seen"
+                db.commit()
             s._run_update(db, run_id, status="running")
             db.commit()
             if not shutil.which("exiftool"):
@@ -152,7 +167,7 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                 def stage(rel: str, payload: dict) -> None:
                     nonlocal staged
                     db.execute(
-                        "INSERT OR REPLACE INTO scan_seen(run_id,source_id,relpath,payload) VALUES(?,?,?,?)",
+                        "INSERT OR REPLACE INTO " + stage_table + "(run_id,source_id,relpath,payload) VALUES(?,?,?,?)",
                         (run_id, source_id, rel, json.dumps(payload, ensure_ascii=False)),
                     )
                     staged += 1
@@ -270,7 +285,7 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                 report(True)
                 missing = db.execute(
                     "SELECT COUNT(*) FROM photos p WHERE p.source_id=? AND p.present=1 "
-                    "AND NOT EXISTS(SELECT 1 FROM scan_seen x WHERE x.run_id=? "
+                    "AND NOT EXISTS(SELECT 1 FROM " + stage_table + " x WHERE x.run_id=? "
                     "AND x.source_id=p.source_id AND x.relpath=p.relpath)",
                     (source_id, run_id),
                 ).fetchone()[0]
@@ -291,7 +306,7 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                         f"{c}=excluded.{c}" for c in s.COLUMNS if c not in ("source_id", "relpath")
                     )
                     for row in db.execute(
-                        "SELECT relpath,payload FROM scan_seen WHERE run_id=? AND source_id=?",
+                        "SELECT relpath,payload FROM " + stage_table + " WHERE run_id=? AND source_id=?",
                         (run_id, source_id),
                     ):
                         if row["payload"] == "{}":
@@ -306,9 +321,16 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                                 placeholders + ") ON CONFLICT(source_id,relpath) DO UPDATE SET " + setters,
                                 tuple(item.get(key) for key in s.COLUMNS),
                             )
+                    if v2:
+                        db.execute(
+                            "UPDATE photos SET missing_scans=missing_scans+1 WHERE source_id=? AND present=0 "
+                            "AND NOT EXISTS(SELECT 1 FROM " + stage_table + " x WHERE x.run_id=? "
+                            "AND x.source_id=photos.source_id AND x.relpath=photos.relpath)",
+                            (source_id, run_id)
+                        )
                     db.execute(
-                        "UPDATE photos SET present=0,updated_at=? WHERE source_id=? AND present=1 "
-                        "AND NOT EXISTS(SELECT 1 FROM scan_seen x WHERE x.run_id=? "
+                        "UPDATE photos SET present=0," + ("missing_scans=1," if v2 else "") + "updated_at=? WHERE source_id=? AND present=1 "
+                        "AND NOT EXISTS(SELECT 1 FROM " + stage_table + " x WHERE x.run_id=? "
                         "AND x.source_id=photos.source_id AND x.relpath=photos.relpath)",
                         (s.now(), source_id, run_id),
                     )
@@ -317,7 +339,7 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                         (s.now(), run_id, source_id),
                     )
                     progress["removed"] += missing
-                    db.execute("DELETE FROM scan_seen WHERE run_id=? AND source_id=?", (run_id, source_id))
+                    db.execute("DELETE FROM " + stage_table + " WHERE run_id=? AND source_id=?", (run_id, source_id))
                 progress["phase"] = "completed_source"
                 report(True)
             progress["phase"] = "completed"
@@ -328,11 +350,24 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
             db.rollback()
             s._run_update(db, run_id, status="cancelled", phase="cancelled",
                           active_workers=0, ended_at=s.now(), error=str(exc)[:1200])
-            db.execute("DELETE FROM scan_seen WHERE run_id=?", (run_id,))
+            db.execute("DELETE FROM " + stage_table + " WHERE run_id=?", (run_id,))
             db.commit()
         except Exception as exc:
             db.rollback()
             s._run_update(db, run_id, status="failed", phase="failed",
                           active_workers=0, ended_at=s.now(), error=str(exc)[:1200])
-            db.execute("DELETE FROM scan_seen WHERE run_id=?", (run_id,))
+            db.execute("DELETE FROM " + stage_table + " WHERE run_id=?", (run_id,))
             db.commit()
+        finally:
+            if stage_path is not None:
+                try:
+                    if db.in_transaction:
+                        db.rollback()
+                    db.execute("DETACH DATABASE scan_stage")
+                except Exception:
+                    pass
+                for suffix in ("", "-journal", "-wal", "-shm"):
+                    try:
+                        stage_path.with_name(stage_path.name + suffix).unlink(missing_ok=True)
+                    except OSError:
+                        pass
