@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getPhotoMaintenance, startPhotoMaintenance,
   type PhotoMaintenanceStatus, type PhotoMaintenanceJob } from "../../api/photoData";
 
@@ -63,6 +64,12 @@ export function PhotoDatabaseMaintenance({onUpdated,mode="manage"}:{
   }
   const job:PhotoMaintenanceJob|null=stats?.job||null;
   const showPrompt=!!stats?.migration_required&&!deferred&&!activeJob;
+  useEffect(()=>{
+    if(!showPrompt)return;
+    const previous=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    return ()=>{document.body.style.overflow=previous;};
+  },[showPrompt]);
   return <>
     {mode==="manage"?<section className="panel p-4 space-y-3" aria-label="照片索引数据库维护">
       <div className="flex flex-wrap justify-between items-center gap-3">
@@ -139,7 +146,7 @@ export function PhotoDatabaseMaintenance({onUpdated,mode="manage"}:{
         </div>
       </div>:null}
     </section>:null}
-    {showPrompt?<div className="photo-modal-layer fixed inset-0 z-[95] flex items-center justify-center p-4">
+    {showPrompt?createPortal(<div className="photo-modal-layer fixed inset-0 z-[115] flex items-center justify-center p-4">
       <div className="photo-modal-backdrop absolute inset-0" aria-hidden="true"/>
       <div role="dialog" aria-modal="true" aria-labelledby="photo-migration-heading"
         className="relative panel p-5 sm:p-6 w-full max-w-xl space-y-4 shadow-2xl">
@@ -166,6 +173,6 @@ export function PhotoDatabaseMaintenance({onUpdated,mode="manage"}:{
           </button>
         </div>
       </div>
-    </div>:null}
+    </div>,document.body):null}
   </>;
 }
