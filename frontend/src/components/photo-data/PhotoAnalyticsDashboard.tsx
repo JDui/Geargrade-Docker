@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
@@ -168,38 +169,154 @@ function Heat({title,desc,xs,ys,data,onChoose}:{
     {onChoose&&<p className="text-[11px] text-textSecondary mt-1">{hint}（二维联合条件）</p>}
   </Panel>;
 }
+type DatePreview = {
+  date: string; weekday: string; count: number; yearCount: number; activeDays: number;
+  x: number; y: number;
+};
+
 function Calendar({daily,choose}:{
   daily:PhotoAnalytics["timeline"]["daily"];choose:(field:string,name:string)=>void;
 }) {
-  const years=useMemo(()=>[...new Set(daily.map(d=>d.date.slice(0,4)))].sort().reverse(),[daily]);
-  const [requested,setRequested]=useState("");
-  const year=years.includes(requested)?requested:years[0];
-  const observations=new Map(daily.filter(d=>d.date.startsWith(year)).map(d=>[d.date,d.count]));
-  const max=Math.max(1,...observations.values());
-  const start=year?Date.UTC(Number(year),0,1):0;
-  const offset=year?(new Date(start).getUTCDay()+6)%7:0;
-  const days=year?(Date.UTC(Number(year)+1,0,1)-start)/86400000:0;
-  return <Panel title="全年拍摄日历热力图" desc="每格一天，显示实际拍摄活跃度（不是文件数）" wide>
-    {year?<div>
-      <label className="text-xs text-textSecondary">选择年份
-        <select className="input ml-2 w-auto" value={year} onChange={e=>setRequested(e.target.value)}>
-          {years.map(y=><option key={y} value={y}>{y}</option>)}
-        </select>
-      </label>
-      <div className="mt-4 overflow-x-auto pb-2">
-        <div className="grid grid-flow-col w-max gap-1" style={{gridTemplateRows:"repeat(7,14px)"}}>
-          {Array.from({length:offset},(_,i)=><div className="w-3.5 h-3.5" key={"gap"+i}/>)}
-          {Array.from({length:days},(_,i)=>{
-            const date=new Date(start+i*86400000).toISOString().slice(0,10);
-            const v=observations.get(date)||0;
-            return <button key={date} className="w-3.5 h-3.5 rounded-[3px] hover:ring-1 hover:ring-accent"
-              type="button" title={date+": "+count(v)+"次"} aria-label={date+"拍摄"+v+"次"}
-              onClick={()=>choose("capture.date",date)}
-              style={{backgroundColor:"rgb(var(--color-accent) / "+(v?.15+Math.sqrt(v/max)*.82:.05)+")"}}/>;
-          })}
+  const years=useMemo(()=>[...new Set(
+    daily.map(d=>Number(d.date.slice(0,4))).filter(y=>Number.isInteger(y)&&y>=1000&&y<=9999)
+  )].sort((a,b)=>a-b),[daily]);
+  const earliest=years[0], latest=years[years.length-1];
+  const [requested,setRequested]=useState<[number,number]|null>(null);
+  const [preview,setPreview]=useState<DatePreview|null>(null);
+  const from=requested?Math.max(earliest,Math.min(latest,requested[0])):earliest;
+  const to=requested?Math.max(from,Math.min(latest,requested[1])):latest;
+  const visibleYears=useMemo(()=>years.filter(y=>y>=from&&y<=to),[years,from,to]);
+  const observations=useMemo(()=>new Map(daily.map(d=>[d.date,d.count])),[daily]);
+  const totals=useMemo(()=>{
+    const values=new Map<number,{total:number;activeDays:number;peak:number}>();
+    for(const entry of daily) {
+      const year=Number(entry.date.slice(0,4));
+      const old=values.get(year)??{total:0,activeDays:0,peak:0};
+      old.total+=entry.count;
+      old.activeDays+=entry.count>0?1:0;
+      old.peak=Math.max(old.peak,entry.count);
+      values.set(year,old);
+    }
+    return values;
+  },[daily]);
+  const showPreview=(event:SyntheticEvent<HTMLButtonElement>,date:string,
+    n:number,yearCount:number,activeDays:number)=>{
+    const rect=event.currentTarget.getBoundingClientRect();
+    const day=new Date(date+"T00:00:00Z");
+    const weekday=["周日","周一","周二","周三","周四","周五","周六"][day.getUTCDay()];
+    setPreview({
+      date,weekday,count:n,yearCount,activeDays,
+      x:Math.max(12,Math.min(rect.left+rect.width/2-112,window.innerWidth-236)),
+      y:rect.top>125?rect.top-112:rect.bottom+12
+    });
+  };
+  return <Panel title="全年拍摄日历热力图" desc="拖动时间范围滑条查看多个年份；方块代表日期，悬停可预览拍摄情况" wide>
+    {years.length?<div className="space-y-5">
+      <div className="rounded-xl border border-line/70 bg-panelAlt/40 p-3 sm:p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-textPrimary">拍摄时间范围</span>
+          <span className="text-sm font-semibold text-accent tabular-nums" aria-live="polite">
+            {from===to?from+" 年":from+" — "+to+" 年"}
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <label className="flex flex-col gap-2 text-xs text-textSecondary">
+            <span>起始年份 <strong className="text-textPrimary tabular-nums">{from}</strong></span>
+            <input aria-label="起始年份" type="range" min={earliest} max={latest} step={1}
+              disabled={earliest===latest} value={from}
+              className="photo-year-range-slider w-full"
+              onChange={event=>{
+                const next=Number(event.target.value);
+                setRequested([Math.min(next,to),to]);setPreview(null);
+              }}/>
+          </label>
+          <label className="flex flex-col gap-2 text-xs text-textSecondary">
+            <span>结束年份 <strong className="text-textPrimary tabular-nums">{to}</strong></span>
+            <input aria-label="结束年份" type="range" min={earliest} max={latest} step={1}
+              disabled={earliest===latest} value={to}
+              className="photo-year-range-slider w-full"
+              onChange={event=>{
+                const next=Number(event.target.value);
+                setRequested([from,Math.max(from,next)]);setPreview(null);
+              }}/>
+          </label>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-[11px] text-textSecondary">
+          <span>{earliest} 年</span>
+          <span>当前展示 {visibleYears.length} 个有拍摄记录的年份</span>
+          <span>{latest} 年</span>
         </div>
       </div>
-      <p className="text-xs text-textSecondary mt-1">{hint}，未拍摄日期显示为空白浅色方块</p>
+      <div className="space-y-5" onScroll={()=>setPreview(null)}>
+        {visibleYears.map(year=>{
+          const first=Date.UTC(year,0,1);
+          const offset=(new Date(first).getUTCDay()+6)%7;
+          const days=(Date.UTC(year+1,0,1)-first)/86400000;
+          const summary=totals.get(year)??{total:0,activeDays:0,peak:0};
+          const peak=Math.max(1,summary.peak);
+          const monthStarts=Array.from({length:12},(_,month)=>{
+            const dayIndex=(Date.UTC(year,month,1)-first)/86400000;
+            return {month,week:Math.floor((offset+dayIndex)/7)};
+          });
+          return <section key={year} className="rounded-xl border border-line/60 p-3 sm:p-4 space-y-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h4 className="text-lg font-semibold text-textPrimary tabular-nums">{year} 年</h4>
+              <span className="text-xs text-textSecondary tabular-nums">
+                {count(summary.total)} 次拍摄 · {count(summary.activeDays)} 个活跃日
+              </span>
+            </div>
+            <div className="overflow-x-auto pb-3">
+              <div className="flex w-max gap-2">
+                <div className="mt-6 grid grid-rows-7 gap-1 text-[10px] text-textSecondary" style={{gridTemplateRows:"repeat(7,14px)"}}>
+                  {["一","二","三","四","五","六","日"].map((w,i)=>
+                    <span className="flex h-3.5 items-center justify-center" key={i}>{w}</span>)}
+                </div>
+                <div className="w-max">
+                  <div className="relative mb-1 h-5" style={{width:Math.ceil((offset+days)/7)*18}}>
+                    {monthStarts.map(({month,week})=>
+                      <span key={month} className="absolute top-0 text-[10px] text-textSecondary"
+                        style={{left:week*18}}>{month+1}月</span>)}
+                  </div>
+                  <div className="grid grid-flow-col w-max gap-1" style={{gridTemplateRows:"repeat(7,14px)"}}>
+                    {Array.from({length:offset},(_,i)=>
+                      <div className="h-3.5 w-3.5" key={"gap-"+i} aria-hidden="true"/>)}
+                    {Array.from({length:days},(_,i)=>{
+                      const date=new Date(first+i*86400000).toISOString().slice(0,10);
+                      const value=observations.get(date)||0;
+                      const shade=value?.15+Math.sqrt(value/peak)*.82:.055;
+                      return <button key={date} type="button"
+                        className="photo-calendar-day w-3.5 h-3.5 rounded-[3px] focus-visible:ring-2 focus-visible:ring-accent hover:ring-1 hover:ring-accent"
+                        aria-label={date+"拍摄"+value+"次"}
+                        onMouseEnter={event=>showPreview(event,date,value,summary.total,summary.activeDays)}
+                        onMouseLeave={()=>setPreview(null)}
+                        onFocus={event=>showPreview(event,date,value,summary.total,summary.activeDays)}
+                        onBlur={()=>setPreview(null)}
+                        onClick={()=>{setPreview(null);choose("capture.date",date);}}
+                        style={{backgroundColor:"rgb(var(--color-accent) / "+shade+")"}}/>;
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>;
+        })}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-textSecondary">
+        <span>浅色表示无拍摄记录，深色表示当年相对较高的拍摄量；颜色强度按各年独立归一化。</span>
+        <span>{hint} · 支持鼠标悬停及键盘聚焦预览</span>
+      </div>
+      {preview?createPortal(
+        <div role="tooltip" data-testid="photo-calendar-preview"
+          className="fixed z-[120] pointer-events-none rounded-xl border border-line bg-panel p-3 text-textPrimary shadow-2xl"
+          style={{left:preview.x,top:preview.y,width:224}}>
+          <div className="text-sm font-semibold tabular-nums">{preview.date} <span className="ml-1 text-xs font-normal text-textSecondary">{preview.weekday}</span></div>
+          <div className="mt-2 text-lg font-bold text-accent tabular-nums">{count(preview.count)} <span className="text-xs font-normal text-textSecondary">次拍摄</span></div>
+          <div className="mt-1 text-xs text-textSecondary">
+            {preview.count?"占当年拍摄量 "+ratio(preview.count,preview.yearCount):"当日没有索引拍摄记录"}
+          </div>
+          <div className="mt-1 text-[11px] text-textSecondary">该年共 {count(preview.yearCount)} 次拍摄 / {count(preview.activeDays)} 个活跃日</div>
+        </div>,document.body
+      ):null}
     </div>:<NoData/>}
   </Panel>;
 }
@@ -370,7 +487,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
       {tab==="exposure"&&<>
         <Buckets title="ISO 感光度分布" desc="按区间聚合的感光度直方图" items={d.exposure.iso} onChoose={bin}/>
         <Donut title="等效焦距识别来源" desc="EXIF 原生等效焦距、机身画幅推算或未知；未知不会按 1× 处理"
-          items={d.exposure.focal_coverage.map(v=>({...v,name:
+          items={(d.exposure.focal_coverage??[]).map(v=>({...v,name:
             v.name==="EXIF"?"EXIF 等效焦距":v.name==="camera_profile"?"机身画幅换算":"画幅未知 / 无等效数据"}))}/>
         <Buckets title="35mm 等效焦距分布" desc="优先使用 EXIF 等效焦距；缺失时只按已识别机身画幅换算，未知画幅不混入分布" items={d.exposure.focal} onChoose={bin}/>
         <Buckets title="光圈分布" desc="F 值区间频率" items={d.exposure.aperture} onChoose={bin}/>
