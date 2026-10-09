@@ -371,3 +371,29 @@ npm test
 ## 规划中的功能：拍摄数据（尚未实现）
 
 [拍摄数据模块设计规范与实施路线](docs/photo-data/README.md)：计划通过**手动扫描 + 只读目录 + SQLite 增量 EXIF 索引**，分析历史相机、镜头、RAW/JPEG/HEIF 文件的拍摄习惯；本链接是规范草案，不代表功能已上线。
+
+## 1.0.0 — 拍摄数据（2026-10-09）
+
+本次新增手动照片索引与拍摄统计，独立 SQLite 数据库、RAW/JPEG/HEIF 的 ExifTool 只读解析、动态筛选、高级筛选条件、拍摄设备使用量榜，以及适用于数万张照片的自适应并发扫描与可视化进度。项目其他已有数据保持不变。
+
+**照片目录必须由管理员在 Docker Compose 中只读挂载。** 可在部署目录新增 docker-compose.photos.yml，并与原 docker-compose.yml 一同启动：
+
+~~~yaml
+services:
+  app:
+    volumes:
+      - /host/photo-archive:/mnt/photo-library:ro
+    environment:
+      PHOTO_DATA_ALLOWED_ROOTS: /mnt/photo-library
+      PHOTO_DATA_DB_PATH: /app/data/photo_index.db
+~~~
+
+~~~bash
+docker compose -f docker-compose.yml -f docker-compose.photos.yml up -d --build
+~~~
+
+在 Geargrade 的「设置 → 拍摄数据源」中输入容器内部路径 /mnt/photo-library，再到「拍摄数据」页点击「扫描更新」。**保存来源、启动服务、打开图表不会触碰图库**；默认没有定时扫描、文件监听或自动重扫。照片目录不可写，索引单独保存在 geargrade_data 卷中。
+
+自动并发规划依 CPU 核数与文件系统类型确定初始工作线程；NFS/SMB 默认更保守，并根据解析批次耗时、错误率调整同时运行的提取任务；队列始终有界。扫描进度显示已发现/已处理、解析成功/失败、工作线程、文件处理速度和在枚举完成后的剩余时间估算。NAS 掉线或目录枚举不完整时不会发布缺失删除。GPS 不索引也不导出。
+
+完整产品规范参见 [拍摄数据](docs/photo-data/README.md)。当前 1.0.0 应运行 CI 和以真实 RAW 文件验证设备专有标签后再用于生产环境；高级 MakerNotes 的厂商兼容性不保证所有机型完全一致。Geargrade 当前定位可信局域网使用，公开部署必须额外配置用户认证和访问控制。

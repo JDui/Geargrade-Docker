@@ -1,0 +1,36 @@
+name: Validate Geargrade 1.0.0
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install requirements
+        run: pip install -r backend/requirements.txt
+      - name: Run Python tests
+        working-directory: backend
+        run: pytest -q
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install packages
+        working-directory: frontend
+        run: npm install
+      - name: Typecheck and compile
+        working-directory: frontend
+        run: npm run build
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm run test -- --run
