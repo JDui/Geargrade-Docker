@@ -109,6 +109,12 @@ def facets(payload: FacetInput):
     return call(photos.facets, payload.filter, payload.field, payload.limit)
 
 
+@router.post("/analytics/query")
+def analytics_query(payload: FilterInput):
+    from app.photo_data.analytics import analyze
+    return call(analyze, payload.filter)
+
+
 @router.get("/summary")
 def summary():
     return photos.summary()
