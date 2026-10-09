@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .db import connect
+from .db import MAINTENANCE_LOCK, connect
 
 IMAGE_EXT = {
     ".arw": "raw", ".sr2": "raw", ".srf": "raw", ".raf": "raw", ".orf": "raw",
@@ -47,6 +47,17 @@ EXIF_TAGS = (
     "FocalLengthIn35mmFormat", "ImageQuality", "HighISONoiseReduction",
     "Stabilization", "AFMode", "HDR", "DigitalZoomRatio",
 )
+# Store EXIF details not already materialized in dedicated typed columns.
+EXIF_STRUCTURED_TAGS = {
+    "DateTimeOriginal", "CreateDate", "Make", "Model", "LensModel", "ISO",
+    "ExposureTime", "FNumber", "FocalLength", "ImageWidth", "ImageHeight",
+    "ExifImageWidth", "ExifImageHeight", "ExposureCompensation", "Flash",
+    "WhiteBalance", "FocusMode", "ShutterType", "DriveMode", "PictureStyle",
+    "FilmMode", "FilmSimulation", "CreativeLook", "FirmwareVersion",
+    "Rating", "ColorSpace", "Software",
+}
+EXIF_EXTENSION_TAGS = frozenset(EXIF_TAGS) - EXIF_STRUCTURED_TAGS
+
 COLUMNS = (
     "source_id", "relpath", "filename", "ext", "format_family", "size_bytes",
     "mtime_ns", "capture_key", "shot_at", "camera_make", "camera_model",
@@ -231,7 +242,7 @@ def metadata(tags: dict, relpath: str, size: int, mtime_ns: int, source_id: str)
         "rating": number(tags.get("Rating")),
         "color_space": str(tags["ColorSpace"]) if tags.get("ColorSpace") else None,
         "software": str(tags["Software"]) if tags.get("Software") else None,
-        "tags_json": json.dumps(tags, ensure_ascii=False),
+        "tags_json": json.dumps({key: value for key, value in tags.items() if key in EXIF_EXTENSION_TAGS}, ensure_ascii=False),
         "parse_status": "ok", "present": 1, "updated_at": now(),
     }
 
@@ -261,22 +272,27 @@ def _run_update(db: sqlite3.Connection, run_id: str, **kwargs: Any) -> None:
 
 def launch_scan(source_ids: list[str] | None = None, deep: bool = False,
                 confirm_large_removal: bool = False) -> str:
-    with SCAN_LOCK:
-        with connect() as db:
-            selected = db.execute("SELECT id FROM sources WHERE enabled=1 ORDER BY created_at").fetchall()
-            available = {x["id"] for x in selected}
-            targets = list(dict.fromkeys(source_ids if source_ids is not None else list(available)))
-            if not targets or any(source not in available for source in targets):
-                raise ValueError("没有已启用的有效扫描来源")
-            run_id = str(uuid.uuid4())
-            try:
-                db.execute(
-                    "INSERT INTO scan_runs(id,started_at,status,mode,source_ids) VALUES(?,?,?,?,?)",
-                    (run_id, now(), "queued", "deep" if deep else "incremental",
-                     json.dumps(targets))
-                )
-            except sqlite3.IntegrityError as exc:
-                raise ValueError("已有扫描作业正在执行") from exc
+    if not MAINTENANCE_LOCK.acquire(blocking=False):
+        raise ValueError("数据库维护或迁移正在执行，不能开始扫描")
+    try:
+        with SCAN_LOCK:
+            with connect() as db:
+                selected = db.execute("SELECT id FROM sources WHERE enabled=1 ORDER BY created_at").fetchall()
+                available = {x["id"] for x in selected}
+                targets = list(dict.fromkeys(source_ids if source_ids is not None else list(available)))
+                if not targets or any(source not in available for source in targets):
+                    raise ValueError("没有已启用的有效扫描来源")
+                run_id = str(uuid.uuid4())
+                try:
+                    db.execute(
+                        "INSERT INTO scan_runs(id,started_at,status,mode,source_ids) VALUES(?,?,?,?,?)",
+                        (run_id, now(), "queued", "deep" if deep else "incremental",
+                         json.dumps(targets))
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise ValueError("已有扫描作业正在执行") from exc
+    finally:
+        MAINTENANCE_LOCK.release()
     from .scanner import scan_worker
     threading.Thread(target=scan_worker, args=(run_id, targets, deep, confirm_large_removal),
                      daemon=True, name="photo-scan-" + run_id[:8]).start()
