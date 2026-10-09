@@ -48,7 +48,7 @@ services:
 - 后端 ExifTool 命令固定只读参数，严格禁止 -overwrite_original、-tagsfromfile、重命名、写文件、sidecar 输出；用户输入不组成 shell 命令；文件名经 argv 或受控 argfile 传入。
 - 照片内容既不由静态资源端点公开，也不经 API 原样下载；只读挂载无论软件权限如何均作为额外防线。
 - API 写入扫描配置和启动作业属于管理员操作；当前 Geargrade 尚无认证边界，暴露公网前需增加管理认证或限制 LAN / 反向代理访问。跨域 CORS 现状较宽松，正式实施须复核 mutating endpoint 的跨站防护。
-- 索引导出的 GPS、机身序列号、精确路径是隐私数据。默认导出脱敏，原始 EXIF 全字段仅本地索引保留。
+- 严格不索引 GPS 或任何位置元数据；原始 ExifTool/MakerNotes JSON 必须入库前做位置字段清洗，不提供地理搜索/地图/导出。机身序列号与精确路径是隐私数据；导出默认脱敏，只有审查后的非位置信息原始标签可作为可选字段保留。
 
 ## 4. 数据库模型
 
@@ -59,18 +59,21 @@ services:
 | photo_sources | id(UUID), name, root_path, enabled, created_at, last_attempt_at, last_successful_scan_at, last_success_generation | 只保存配置，无添加即扫描 |
 | photo_scan_runs | id, source_id, generation, state, started_at, completed_at, files_seen, candidates, created, changed, unchanged, missing, parse_failed, directories_failed, error_code, error_summary | 手动作业审计 |
 | photo_files | id, source_id, relative_path, extension, format_family, size_bytes, mtime_ns, ctime_ns?, inode?, file_fingerprint, last_seen_generation, first_seen_at, indexed_at, parse_status, is_present, removed_at, exif_extracted_at, metadata_version | 物理文件唯一索引 |
-| photo_metadata | photo_file_id(PK), capture_at_local, utc_offset_minutes?, capture_at_utc?, capture_time_source, make_raw, model_raw, make_norm, model_norm, lens_raw, lens_norm, serial_hash?, iso, exposure_s, f_number, focal_mm, focal_35mm_mm?, width_px?, height_px?, orientation?, exposure_comp_ev?, wb?, flash?, gps_lat?, gps_lon?, gps_alt_m?, raw_json_zlib?, raw_json_truncated | 统一字段 + 原始标签压缩存档 |
+| photo_metadata | photo_file_id(PK), capture_at_local, utc_offset_minutes?, capture_at_utc?, capture_time_source, make_raw, model_raw, make_norm, model_norm, lens_raw, lens_norm, serial_hash?, iso, exposure_s, f_number, focal_mm, focal_35mm_mm?, width_px?, height_px?, orientation?, exposure_comp_ev?, wb?, flash?, raw_json_zlib?, raw_json_truncated | 统一字段 + 原始标签压缩存档 |
 | photo_captures | id, source_id, capture_key, representative_file_id, captured_at, model_norm, grouping_confidence, created_at | 逻辑拍摄实体 |
 | photo_capture_files | capture_id, photo_file_id, role(raw/jpeg/heif/other), PRIMARY KEY(capture_id, photo_file_id) | RAW+JPEG 等同一次拍摄 |
 | photo_device_aliases | id, kind(camera/lens), observed_make, observed_model, normalized_key, device_id?, match_method, confidence, manually_confirmed, updated_at | 型号对照和人工绑定 |
 | photo_file_errors | id, file_id?, scan_run_id, relative_path, stage, code, description, occurred_at | 每次解析/访问失败快照 |
+| photo_filter_presets | id, name, filter_schema_version, ast_json, columns_json, owner_scope?, created_at, updated_at | Lightroom 多列/高级规则预设，不访问源目录 |
+| photo_query_cache（可选） | snapshot_id, filter_hash, response_kind, result_json, computed_at | 分面与聚合查询缓存；快照发布/别名变更后失效 |
 
 约束与索引：
 
 - UNIQUE(source_id, relative_path)，所有 relative_path 使用根下标准 POSIX 相对路径，保留实际大小写；不通过 basename 判定同一文件。
 - INDEX(source_id, is_present, last_seen_generation) 支撑删旧；INDEX(source_id, mtime_ns, size_bytes) 支撑候选比较；INDEX(photo_metadata.capture_at_utc)、(model_norm, capture_at_utc)、(lens_norm, capture_at_utc) 支撑时间/设备图表；UNIQUE(source_id, capture_key)。
 - 外键 pragma foreign_keys=ON；WAL、busy_timeout、事务批处理；scan writer 单进程排他，API analytics 用短只读事务。
-- JSON/扩展 MakerNotes 可按 photo_file_id 压缩保存，不应为每个长尾 MakerNote 都建立 SQL 列；对可统计的常用字段建立类型化列，避免每次图表重复反序列化。
+- 经过**位置字段彻底移除**的 JSON/扩展 MakerNotes 可按 photo_file_id 压缩保存；对可统计的常用字段建立类型化列，并维护字段白名单注册表与必要 SQL / facet 索引，避免每次图表重复反序列化。动态筛选一律服务端 AST 白名单编译，无原始 SQL 输入。
+- 为拍摄使用量榜提供 canonical 型号聚合能力；跨数据库设备 ID 允许为 NULL，重复购入不得自动绑定某一个轮次。榜单接口设计见 [USAGE_LEADERBOARD.md](USAGE_LEADERBOARD.md)。
 - DB 迁移有 schema_migrations 版本表、备份与失败回滚；现有数据工具的“重置所有数据”默认**不得**清除摄影索引，必须增加独立确认后才允许重置该索引。
 
 ## 5. 并发与故障容忍

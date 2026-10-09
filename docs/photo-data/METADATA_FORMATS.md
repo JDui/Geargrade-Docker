@@ -26,7 +26,7 @@
 
 ## 2. 原始标签与统一字段并存
 
-ExifTool 必须保留原始 namespace/tag/source provenance、重复标签可能性（例如 -a -G1 -s -n JSON），还要将高频字段规范化为稳定的类型化 Schema。原始标签字典按文件压缩存储（推荐 zlib；新增 zstandard 可选）、默认上限 1 MiB/文件，超限标记 truncated，不能静默截掉统计必需字段。
+ExifTool 必须保留**非位置信息**原始 namespace/tag/source provenance、重复标签可能性（例如 -a -G1 -s -n JSON），还要将高频字段规范化为稳定的类型化 Schema。GPS、经纬度、地理反查与任何同义位置标签在提取/入库前直接排除，不得保存在压缩原始 JSON 或全文搜索索引中；入库前采用标签黑名单结合已审查的允许字段策略处理 MakerNotes/QuickTime 等隐藏位置字段。原始标签字典按文件压缩存储（推荐 zlib；新增 zstandard 可选）、默认上限 1 MiB/文件，超限标记 truncated，不能静默截掉统计必需字段。
 
 每个标准字段必须记录 source_tag、unit、parse_status（present/missing/invalid/inferred）。重要字段：
 
@@ -39,7 +39,6 @@ ExifTool 必须保留原始 namespace/tag/source provenance、重复标签可能
 | 曝光 | iso, exposure_s, f_number, exposure_comp_ev, exposure_program, metering_mode, flash | exposure_s 作为数值秒保存，UI 才格式化 1/250 s |
 | 传感与输出 | width_px, height_px, orientation, color_space, bit_depth_optional, raw_bit_depth_optional, compression, crop_factor_optional | 分辨率区分传感器与输出尺寸 |
 | 高级曝光 | shutter_type, focus_mode, af_area, stabilization, burst_mode, white_balance, creative_filter, picture_profile | 所有厂商 MakerNotes 都须 optional + provenance |
-| 空间 | gps_lat, gps_lon, gps_alt_m, gps_timestamp, gps_source | 按精度保留；默认导出脱敏 |
 | 归类 | media_role(raw/jpeg/heif/other), capture_group_id, match_confidence, parser_name, parser_version | 不能以 JPEG 数替代逻辑拍摄数 |
 
 数值约束：ISO >= 0，曝光时间 > 0，光圈 f_number > 0，焦距单位 mm，时间戳携带“是否可靠时区”标志；无值用 NULL，不使用 0 或字符串 unknown 冒充有效 EXIF。格式标签 ISO 为列表、分数、文本时要先做类型化解析，无法解析保留原始值与错误信息。高度宽度方向须结合 Orientation 区分像素宽高和展示旋转。
@@ -47,6 +46,8 @@ ExifTool 必须保留原始 namespace/tag/source provenance、重复标签可能
 时间回退优先级：SubSecDateTimeOriginal / DateTimeOriginal + OffsetTimeOriginal > CreateDate + 明确偏移 > EXIF DateTimeOriginal 无时区 > FileModifyDate（仅作近似，并标记 filesystem_fallback）。不同相机时区设置、夏令时、同步时间误差不得自动“纠正”历史照片；跨时区统计需显式选择“拍摄本地日历”或“已知 UTC”。
 
 ## 3. EXIF 相机、镜头归一化和 Geargrade 关联
+
+标准化字段在 [FILTER_INTERACTIONS.md](FILTER_INTERACTIONS.md) 维护单一的可查询字段注册表；并非每个 MakerNotes 标签都可直接被筛选。支持条件（时间、机身镜头、曝光、文件、机内效果、XMP 管理信息）按字段实际可用率控制筛选 UI。GPS 及其同义字段不会进入表结构/原始标签/筛选/排行/导出。
 
 建议三层表示：
 1. observed：原始 Make/Model/LensModel 标签，永不覆盖。
