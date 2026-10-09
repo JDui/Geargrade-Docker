@@ -84,7 +84,7 @@ export function PhotoDatabaseMaintenance({onUpdated,mode="manage"}:{
           查看升级提示
         </button>
       </div>:null}
-      {stats?.schema_version===stats?.target_schema_version&&mode==="manage"?<p className="text-xs leading-6 text-textSecondary">
+      {stats&&stats.schema_version===stats.target_schema_version&&mode==="manage"?<p className="text-xs leading-6 text-textSecondary">
         v2 已启用独立扫描暂存与精简 EXIF。SQLite 不会因为迁移自动缩小文件；
         {stats.freelist_bytes>0?("当前可复用空闲页约 "+bytes(stats.freelist_bytes)+"，"):"当前没有大量空闲页，"}
         需要在无扫描任务时手动执行下方「压缩数据库」，而迁移备份不会自动删除。
