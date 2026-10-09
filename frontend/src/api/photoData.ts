@@ -13,7 +13,8 @@ export type PhotoScan = { id: string; started_at: string; ended_at: string | nul
 export type PhotoStatus = { sources: PhotoSource[]; recent_scans: PhotoScan[]; last_success: string | null };
 export type PhotoSummary = { physical_files: number; logical_captures: number; raw_files: number | null; total_bytes: number;
   first_shot: string | null; last_shot: string | null; months: Array<{month:string;count:number}>; as_of:string | null };
-export type PhotoItem = { id: number; filename: string; relpath: string; format_family: string; size_bytes: number;
+export type PhotoItem = { id: number; source_id: string; filename: string; relpath: string; ext: string; format_family: string; size_bytes: number;
+  width_px: number | null; height_px: number | null;
   camera_model: string | null; camera_norm: string | null; lens_model: string | null; lens_norm: string | null;
   shot_at: string | null; iso: number | null; aperture: number | null; shutter: number | null; focal_mm: number | null;
   parse_status: string };

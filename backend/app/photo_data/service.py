@@ -67,6 +67,8 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "lens.model_norm": ("lens_norm", "enum", "镜头型号"),
     "files.format_family": ("format_family", "enum", "格式大类"),
     "files.extension": ("ext", "enum", "扩展名"),
+    "files.filename": ("filename", "enum", "文件名"),
+    "files.relpath": ("relpath", "enum", "相对路径"),
     "files.source_id": ("source_id", "enum", "扫描来源"),
     "files.size_bytes": ("size_bytes", "number", "文件大小（字节）"),
     "files.width_px": ("width_px", "number", "宽度（像素）"),
