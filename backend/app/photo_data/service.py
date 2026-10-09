@@ -272,7 +272,8 @@ def launch_scan(source_ids: list[str] | None = None, deep: bool = False,
                 )
             except sqlite3.IntegrityError as exc:
                 raise ValueError("已有扫描作业正在执行") from exc
-    threading.Thread(target=_scan_worker, args=(run_id, targets, deep, confirm_large_removal),
+    from .scanner import scan_worker
+    threading.Thread(target=scan_worker, args=(run_id, targets, deep, confirm_large_removal),
                      daemon=True, name="photo-scan-" + run_id[:8]).start()
     return run_id
 

@@ -77,4 +77,20 @@ def initialize() -> None:
         )
         db.execute("DELETE FROM scan_seen WHERE run_id IN "
                    "(SELECT id FROM scan_runs WHERE status='interrupted')")
+
+        # Small additive migrations for existing installations; no source IO.
+        scan_columns = {r[1] for r in db.execute("PRAGMA table_info(scan_runs)")}
+        additions = {
+            "phase": "TEXT NOT NULL DEFAULT 'queued'",
+            "directories_seen": "INTEGER NOT NULL DEFAULT 0",
+            "total_candidates": "INTEGER NOT NULL DEFAULT 0",
+            "processed": "INTEGER NOT NULL DEFAULT 0",
+            "workers": "INTEGER NOT NULL DEFAULT 0",
+            "active_workers": "INTEGER NOT NULL DEFAULT 0",
+            "enumeration_done": "INTEGER NOT NULL DEFAULT 0",
+            "rate_files_per_sec": "REAL NOT NULL DEFAULT 0",
+        }
+        for column, definition in additions.items():
+            if column not in scan_columns:
+                db.execute(f"ALTER TABLE scan_runs ADD COLUMN {column} {definition}")
         db.commit()
