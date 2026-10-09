@@ -305,13 +305,15 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                     setters = ",".join(
                         f"{c}=excluded.{c}" for c in s.COLUMNS if c not in ("source_id", "relpath")
                     )
+                    if v2:
+                        setters += ",missing_scans=0"
                     for row in db.execute(
                         "SELECT relpath,payload FROM " + stage_table + " WHERE run_id=? AND source_id=?",
                         (run_id, source_id),
                     ):
                         if row["payload"] == "{}":
                             db.execute(
-                                "UPDATE photos SET present=1 WHERE source_id=? AND relpath=?",
+                                "UPDATE photos SET present=1," + ("missing_scans=0 " if v2 else " ") + "WHERE source_id=? AND relpath=?",
                                 (source_id, row["relpath"]),
                             )
                         else:
