@@ -28,6 +28,50 @@ export type PhotoPreset = {id:string;name:string;filter:PhotoFilter;columns:stri
 
 export const emptyPhotoFilter = (): PhotoFilter => ({ version: "photo-filter.v1", group: { op: "and", children: [] } });
 const path = "/api/v1/photo-data";
+export type AnalyticsCount = { name: string; count: number };
+export type AnalyticsPoint = { key: string; count: number };
+export type AnalyticsBucket = { label: string; bucket: number; count: number; min: number | null; max: number | null; field: string };
+export type AnalyticsHeatCell = { x: number; y: number; count: number };
+export type PhotoAnalytics = {
+  schema_version: string;
+  as_of: string | null;
+  overview: {
+    captures: number; files: number; bytes: number; dated: number | null;
+    raw_captures: number; raw_files: number | null; paired_captures: number;
+    failed_files: number | null; camera_known: number | null; lens_known: number | null;
+    first_shot: string | null; last_shot: string | null;
+  };
+  timeline: {
+    yearly: AnalyticsPoint[]; monthly: AnalyticsPoint[];
+    daily: { date: string; count: number }[];
+    hours: { hour: number; count: number }[];
+    weekdays: { weekday: number; count: number }[];
+    weekday_hour: { weekday: number; hour: number; count: number }[];
+  };
+  gear: {
+    cameras: AnalyticsCount[]; lenses: AnalyticsCount[]; makers: AnalyticsCount[];
+    combos: { camera: string; lens: string; count: number }[];
+    camera_years: { year: string; camera: string; count: number }[];
+    lens_by_camera: { camera: string; lens: string; count: number }[];
+  };
+  exposure: {
+    iso: AnalyticsBucket[]; focal: AnalyticsBucket[]; aperture: AnalyticsBucket[];
+    shutter: AnalyticsBucket[]; ev: AnalyticsBucket[];
+    flash: AnalyticsCount[]; wb: AnalyticsCount[]; focus: AnalyticsCount[];
+    drive: AnalyticsCount[]; shutter_type: AnalyticsCount[]; picture_style: AnalyticsCount[];
+    iso_shutter: AnalyticsHeatCell[]; focal_aperture: AnalyticsHeatCell[];
+  };
+  files: {
+    formats: AnalyticsCount[]; capture_formats: AnalyticsCount[];
+    size: AnalyticsBucket[]; resolution: AnalyticsBucket[];
+    orientation: AnalyticsCount[]; aspect: AnalyticsCount[];
+    status: AnalyticsCount[]; software: AnalyticsCount[];
+    color_space: AnalyticsCount[];
+  };
+  quality: { name: string; count: number; total: number }[];
+  notes: { captures: string; files: string; time: string; gaps: string };
+};
+
 export const getPhotoStatus = () => apiGet<PhotoStatus>(path + "/status");
 export const getPhotoFields = () => apiGet<PhotoField[]>(path + "/filter-fields");
 export const createPhotoSource = (name:string, root_path:string) => apiPost<PhotoSource>(path+"/sources", {name,root_path});
@@ -37,6 +81,7 @@ export const startPhotoScan = (mode:string = "incremental", confirm_large_remova
 export const getPhotoScan = (id:string) => apiGet<PhotoScan>(path+"/scan/"+encodeURIComponent(id));
 export const cancelPhotoScan = (id:string) => apiPost<PhotoScan>(path+"/scan/"+encodeURIComponent(id)+"/cancel", {});
 export const getPhotoSummary = (filter:PhotoFilter) => apiPost<PhotoSummary>(path+"/stats/query", {filter});
+export const getPhotoAnalytics = (filter:PhotoFilter) => apiPost<PhotoAnalytics>(path+"/analytics/query", {filter});
 export const getPhotoQuery = (filter:PhotoFilter,limit:number = 40,offset:number = 0) =>
   apiPost<PhotoQuery>(path+"/query", {filter,limit,offset});
 export const getPhotoFacet = (filter:PhotoFilter,field:string) =>
