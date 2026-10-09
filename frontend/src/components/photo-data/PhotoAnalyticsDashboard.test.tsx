@@ -53,6 +53,12 @@ const empty = ():PhotoAnalytics => ({
 });
 describe("PhotoAnalyticsDashboard",()=>{
   beforeEach(()=>{
+    // Recharts ResponsiveContainer relies on a browser observer that jsdom lacks.
+    vi.stubGlobal("ResizeObserver", class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
     vi.mocked(getPhotoAnalytics).mockReset();
     vi.mocked(getPhotoAnalytics).mockResolvedValue(empty());
   });
