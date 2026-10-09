@@ -71,6 +71,9 @@ def _metrics() -> dict:
         scan_rows = db.execute("SELECT COUNT(*) FROM scan_runs").fetchone()[0]
         active = _running(db)
     stage_files = list(dbpath.parent.glob(dbpath.stem + ".scan-stage-*.sqlite"))
+    # Recovery backups are intentionally retained; include them in storage totals.
+    backups = list(dbpath.parent.glob(dbpath.stem + ".pre-v2-*.sqlite.bak"))
+    backup_bytes = sum(_size(p) for p in backups)
     return {
         "schema_version": version,
         "target_schema_version": SCHEMA_VERSION,
@@ -78,6 +81,10 @@ def _metrics() -> dict:
         "db_bytes": _size(dbpath),
         "wal_bytes": _size(dbpath.with_name(dbpath.name + "-wal")),
         "freelist_bytes": int(free_pages * page_size),
+        "backup_count": len(backups),
+        "backup_bytes": backup_bytes,
+        "storage_bytes": _size(dbpath) + _size(dbpath.with_name(dbpath.name + "-wal")) +
+                         sum(_size(p) for p in stage_files) + backup_bytes,
         "page_count": pages,
         "page_size": page_size,
         "physical_files": int(photo_rows[0] or 0),
