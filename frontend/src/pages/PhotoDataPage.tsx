@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PhotoAnalyticsDashboard } from "../components/photo-data/PhotoAnalyticsDashboard";
 import { PhotoMetadataExplorer } from "../components/photo-data/PhotoMetadataExplorer";
+import { PhotoDatabaseMaintenance } from "../components/photo-data/PhotoDatabaseMaintenance";
 import {
   cancelPhotoScan, createPhotoPreset, deletePhotoPreset, emptyPhotoFilter, exportPhotoData,
   getPhotoFacet, getPhotoFields, getPhotoPresets, getPhotoQuery, getPhotoScan, getPhotoStatus,
@@ -441,6 +442,8 @@ export default function PhotoDataPage() {
       </p>:null}
       {message?<p role="alert" className="mt-3 text-sm text-textSecondary">{message}</p>:null}
     </section>
+
+    <PhotoDatabaseMaintenance onUpdated={()=>setRefresh(value=>value+1)}/>
 
     <section className="panel p-3 sm:p-4 space-y-3 photo-workspace-toolbar">
       <div className="flex flex-wrap items-center justify-between gap-3">
