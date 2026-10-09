@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { PhotoAnalyticsDashboard } from "../components/photo-data/PhotoAnalyticsDashboard";
 import {
   cancelPhotoScan, createPhotoPreset, deletePhotoPreset, emptyPhotoFilter, exportPhotoData,
   getPhotoFacet, getPhotoFields, getPhotoPresets, getPhotoQuery, getPhotoScan, getPhotoStatus,
@@ -216,6 +216,15 @@ export default function PhotoDataPage() {
     setPage(0);
   }
 
+  function applyChartFilter(rules:PhotoRule[]) {
+    if(!rules.length)return;
+    setAdvanced(current=>isGroup(current)&&current.op==="and"
+      ? {op:"and",children:[...current.children,...rules]}
+      : {op:"and",children:[current,...rules]});
+    setMode("advanced");
+    setPage(0);
+  }
+
   const selectedCount=columns.reduce((total,c)=>total+c.selected.length,0);
   const sourceReady=!!status?.sources.length;
   const isRunning=!!runId||!!status?.recent_scans.some(x=>["queued","running"].includes(x.status));
@@ -385,22 +394,7 @@ export default function PhotoDataPage() {
       </div>:null}
     </section>
 
-    <section className="panel p-5">
-      <div className="dashboard-kicker">Shooting Timeline</div>
-      <h2 className="mt-1 text-xl font-semibold text-textPrimary">每月拍摄次数</h2>
-      <div className="mt-5 h-64">
-        {summary?.months.length?<ResponsiveContainer width="100%" height="100%">
-          <BarChart data={summary.months}>
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2}/>
-            <XAxis dataKey="month" tick={{fontSize:11}}/>
-            <YAxis allowDecimals={false} tick={{fontSize:11}}/>
-            <Tooltip/><Bar dataKey="count" fill="#5cc8ff" name="拍摄次数"/>
-          </BarChart>
-        </ResponsiveContainer>:<div className="h-full flex items-center justify-center text-textSecondary text-sm">
-          {loading?"统计查询中…":"无有效拍摄日期记录"}
-        </div>}
-      </div>
-    </section>
+    <PhotoAnalyticsDashboard filter={filter} refresh={refresh} onApplyRules={applyChartFilter}/>
 
     <section className="panel p-5 overflow-x-auto">
       <div className="flex items-center justify-between gap-3">

@@ -61,6 +61,7 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "capture.month": ("substr(shot_at,1,7)", "enum", "拍摄年月"),
     "capture.date": ("substr(shot_at,1,10)", "date", "拍摄日期"),
     "capture.hour": ("substr(shot_at,12,2)", "enum", "拍摄小时"),
+    "capture.weekday": ("(CAST(strftime('%w',shot_at) AS INTEGER)+6)%7", "enum", "星期（周一为0）"),
     "camera.make": ("camera_make", "enum", "相机品牌"),
     "camera.model_norm": ("camera_norm", "enum", "相机型号"),
     "lens.model_norm": ("lens_norm", "enum", "镜头型号"),
