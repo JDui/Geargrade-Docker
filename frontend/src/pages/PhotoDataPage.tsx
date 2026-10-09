@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PhotoAnalyticsDashboard } from "../components/photo-data/PhotoAnalyticsDashboard";
 import {
@@ -23,6 +23,25 @@ const displayDate = (value:string|null|undefined) => value ? new Date(value).toL
 const showError = (e:unknown) => e instanceof Error ? e.message : String(e);
 const isGroup = (rule:PhotoRule):rule is Extract<PhotoRule,{children:PhotoRule[]}> => "children" in rule;
 
+function RuleListInput({value,numeric,onChange}:{
+  value:string|number|Array<string|number>|undefined;numeric:boolean;onChange:(values:Array<string|number>)=>void;
+}) {
+  const normalized=String(value??"");
+  const [draft,setDraft]=useState(normalized);
+  const committed=useRef(normalized);
+  useEffect(()=>{
+    if(normalized!==committed.current){setDraft(normalized);committed.current=normalized;}
+  },[normalized]);
+  return <input className="input w-36" aria-label="比较值" placeholder="逗号分隔多个值"
+    value={draft} onBlur={()=>setDraft(normalized)} onChange={e=>{
+      setDraft(e.target.value);
+      const values=e.target.value.split(/[,，]/).map(v=>v.trim());
+      if(values.some(v=>!v||numeric&&!Number.isFinite(Number(v))))return;
+      const parsed=values.map(v=>numeric?Number(v):v);
+      committed.current=String(parsed);onChange(parsed);
+    }}/>;
+}
+
 function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
   rule:PhotoRule; fields:PhotoField[]; onChange:(node:PhotoRule)=>void;
   onRemove?:()=>void; level?:number;
@@ -31,19 +50,19 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
     return <div className="space-y-2 border-l-2 border-accent/30 pl-3 py-2">
       <div className="flex flex-wrap gap-2 items-center">
         <select className="input" aria-label="条件组逻辑" value={rule.op}
-          onChange={(e)=>onChange({op:e.target.value as "and"|"or"|"not",children:e.target.value==="not"?rule.children.slice(0,1):rule.children})}>
+          onChange={(e)=>onChange({op:e.target.value as "and"|"or"|"not",children:e.target.value==="not"?[rule.children[0]??newLeaf()]:rule.children})}>
           <option value="and">全部满足 (AND)</option><option value="or">任意满足 (OR)</option>
           <option value="not">排除组 (NOT)</option>
         </select>
-        <button className="button-secondary" type="button" disabled={level>=5||(rule.op==="not"&&rule.children.length>0)}
+        <button className="button-secondary" type="button" disabled={level>=4||(rule.op==="not"&&rule.children.length>0)}
           onClick={()=>onChange({...rule,children:[...rule.children,newLeaf()]})}>+ 条件</button>
-        <button className="button-secondary" type="button" disabled={level>=5||(rule.op==="not"&&rule.children.length>0)}
+        <button className="button-secondary" type="button" disabled={level>=3||(rule.op==="not"&&rule.children.length>0)}
           onClick={()=>onChange({...rule,children:[...rule.children,{op:"and",children:[newLeaf()]}]})}>+ 分组</button>
         {onRemove?<button className="button-secondary" type="button" onClick={onRemove}>删除组</button>:null}
       </div>
       {rule.children.map((child,index)=><AdvancedRules key={index} rule={child} fields={fields} level={level+1}
         onChange={(next)=>onChange({...rule,children:rule.children.map((n,i)=>i===index?next:n)})}
-        onRemove={()=>onChange({...rule,children:rule.children.filter((_,i)=>i!==index)})}/>)}
+        onRemove={()=>onChange({...rule,op:rule.op==="not"?"and":rule.op,children:rule.children.filter((_,i)=>i!==index)})}/>)}
       {!rule.children.length?<p className="text-xs text-textSecondary">尚无条件，该组不会限制结果。</p>:null}
     </div>;
   }
@@ -60,9 +79,10 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
       {fields.map(f=><option key={f.field_id} value={f.field_id}>{f.label}</option>)}
     </select>
     <select className="input" aria-label="筛选操作符" value={op}
-      onChange={e=>onChange({field:rule.field,op:e.target.value,
-        ...(e.target.value==="is_missing"||e.target.value==="is_present"?{}:{value:e.target.value==="between"?[0,100]:(isNum?0:"")})})}>
+      onChange={e=>onChange({...rule,op:e.target.value,value:
+        e.target.value==="between"?[0,100]:["in","not_in"].includes(e.target.value)?[isNum?0:""]:(isNum?0:"")})}>
       <option value="eq">等于</option><option value="ne">不等于</option>
+      <option value="in">属于列表</option><option value="not_in">不属于列表</option>
       <option value="gte">大于等于</option><option value="gt">大于</option>
       <option value="lte">小于等于</option><option value="lt">小于</option>
       <option value="between">介于（含两端）</option>
@@ -76,12 +96,12 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
           onChange={e=>{
             const next=[...twoValues] as Array<string|number>;
             next[index]=isNum?Number(e.target.value):e.target.value;
-            onChange({field:rule.field,op:rule.op,value:next});
+            onChange({...rule,value:next});
           }}/>)}
-      </div>:
+      </div>:["in","not_in"].includes(op)?
+      <RuleListInput value={rule.value} numeric={isNum} onChange={value=>onChange({...rule,value})}/>:
       <input className="input w-36" aria-label="比较值" type={isNum?"number":"text"}
-        value={String(rule.value??"")} onChange={e=>onChange({field:rule.field,op:rule.op,
-          value:isNum?Number(e.target.value):e.target.value})}/>
+        value={String(rule.value??"")} onChange={e=>onChange({...rule,value:isNum?Number(e.target.value):e.target.value})}/>
     ):null}
     {onRemove?<button type="button" className="button-secondary" onClick={onRemove}>移除</button>:null}
   </div>;
@@ -116,6 +136,9 @@ export default function PhotoDataPage() {
   const [page,setPage]=useState(0);
   const [message,setMessage]=useState("");
   const [loading,setLoading]=useState(false);
+  const [starting,setStarting]=useState(false);
+  const [cancelling,setCancelling]=useState(false);
+  const startPending=useRef(false);
   const [refresh,setRefresh]=useState(0);
 
   const filter=useMemo<PhotoFilter>(()=>{
@@ -136,6 +159,7 @@ export default function PhotoDataPage() {
   },[columns,advanced,fields]);
 
   const filterKey=JSON.stringify(filter);
+  const columnsKey=JSON.stringify(columns.map(({id,field})=>({id,field})));
   useEffect(()=>{
     let mounted=true;
     Promise.all([getPhotoStatus(),getPhotoFields(),getPhotoPresets()])
@@ -151,17 +175,26 @@ export default function PhotoDataPage() {
 
   useEffect(()=>{
     if(!runId)return;
-    const timer=window.setInterval(()=>{
-      void getPhotoScan(runId).then(r=>{
+    const id=runId;
+    let active=true;
+    let timer:number|undefined;
+    async function poll(){
+      try {
+        const r=await getPhotoScan(id);
+        if(!active)return;
         setRun(r);
         if(!["running","queued"].includes(r.status)){
+          setStatus(s=>s?{...s,recent_scans:s.recent_scans.map(item=>item.id===r.id?r:item)}:s);
           setRunId(null);
           setRefresh(x=>x+1);
           if(r.error)setMessage(r.error);
+          return;
         }
-      }).catch(e=>setMessage(showError(e)));
-    },1200);
-    return ()=>window.clearInterval(timer);
+      } catch(e){if(active)setMessage(showError(e));}
+      if(active)timer=window.setTimeout(()=>void poll(),1200);
+    }
+    void poll();
+    return ()=>{active=false;window.clearTimeout(timer);};
   },[runId]);
 
   useEffect(()=>{
@@ -179,15 +212,27 @@ export default function PhotoDataPage() {
       .then(pairs=>{if(active)setFacets(Object.fromEntries(pairs));})
       .catch(e=>{if(active)setMessage(showError(e));});
     return ()=>{active=false;};
-  },[filterKey,refresh]);
+  },[filterKey,columnsKey,refresh]);
 
   async function start() {
+    if(startPending.current)return;
+    startPending.current=true;
+    setStarting(true);
     setMessage("");
     try {
       const result=await startPhotoScan(scanMode,confirmRemovals);
       setRunId(result.job_id);
       setRun(null);
     } catch(e) {setMessage(showError(e));}
+    finally {startPending.current=false;setStarting(false);}
+  }
+
+  async function cancel() {
+    if(!runId||cancelling)return;
+    setCancelling(true);
+    try {await cancelPhotoScan(runId);setMessage("已请求取消，等待当前解析任务结束。");}
+    catch(e){setMessage(showError(e));}
+    finally {setCancelling(false);}
   }
 
   async function save() {
@@ -202,7 +247,8 @@ export default function PhotoDataPage() {
 
   function applyPreset(p:PhotoPreset) {
     const group=p.filter.group;
-    setColumns(p.columns.slice(0,8).map((field,i)=>({id:i+1,field,selected:[]})));
+    const presetColumns=p.columns.length?p.columns:initialColumns.map(column=>column.field);
+    setColumns(presetColumns.slice(0,8).map((field,i)=>({id:i+1,field,selected:[]})));
     setAdvanced(group);
     setMode("advanced");
     setPage(0);
@@ -241,13 +287,16 @@ export default function PhotoDataPage() {
 
   const selectedCount=columns.reduce((total,c)=>total+c.selected.length,0);
   const sourceReady=!!status?.sources.length;
-  const isRunning=!!runId||!!status?.recent_scans.some(x=>["queued","running"].includes(x.status));
-  const latestRun=run??status?.recent_scans[0]??null;
+  const isRunning=starting||!!runId||!!status?.recent_scans.some(x=>["queued","running"].includes(x.status));
+  const latestRun=run??status?.recent_scans.find(x=>["queued","running"].includes(x.status))??status?.recent_scans[0]??null;
   const enumerationDone=!!latestRun?.enumeration_done;
   const doneCount=latestRun?.processed??0;
   const foundCount=latestRun?.seen??0;
   const progressPercent=latestRun?.status==="completed"?100:
     enumerationDone&&foundCount>0?Math.min(99,Math.round(doneCount/foundCount*100)):null;
+  const scanActive=!!latestRun&&["queued","running"].includes(latestRun.status);
+  const progressText=progressPercent===null?
+    (scanActive?"正在发现文件，尚无法确定总量":"扫描已停止，文件总量未确定"):progressPercent+"%";
   const remaining=enummerationDoneGuard(latestRun);
   const phaseName:Record<string,string>={
     queued:"排队中",preflight:"检查挂载",enumerating:"发现文件并解析元数据",
@@ -256,7 +305,7 @@ export default function PhotoDataPage() {
     interrupted:"意外中断",failed:"失败",cancelled:"已取消"
   };
 
-  return <div className="space-y-6">
+  return <div className="photo-data-page space-y-6">
     <section className="panel p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -273,8 +322,8 @@ export default function PhotoDataPage() {
           <button className="button-primary" type="button" disabled={!sourceReady||isRunning} onClick={()=>void start()}>
             {isRunning?"扫描中…":"扫描更新"}
           </button>
-          {isRunning&&runId?<button type="button" className="button-secondary"
-            onClick={()=>void cancelPhotoScan(runId)}>取消</button>:null}
+          {isRunning&&runId?<button type="button" className="button-secondary" disabled={cancelling}
+            onClick={()=>void cancel()}>{cancelling?"取消请求中…":"取消"}</button>:null}
         </div>
       </div>
       <label className="mt-4 flex gap-2 items-center text-xs text-textSecondary">
@@ -285,13 +334,13 @@ export default function PhotoDataPage() {
       {latestRun?<div className="mt-4 rounded-xl bg-panelAlt/70 p-4 space-y-3 text-sm text-textSecondary" aria-live="polite">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <strong className="text-textPrimary">扫描状态：{phaseName[latestRun.phase]||phaseName[latestRun.status]||latestRun.status}</strong>
-          <span>{progressPercent===null?"正在发现文件，尚无法确定总量":progressPercent+"%"} </span>
+          <span>{progressText}</span>
         </div>
         <div role="progressbar" aria-label="扫描进度" aria-valuemin={0} aria-valuemax={100}
-          aria-valuenow={progressPercent??undefined} aria-valuetext={progressPercent===null?"正在枚举目录，进度未确定":progressPercent+"%" }
+          aria-valuenow={progressPercent??undefined} aria-valuetext={progressText}
           className="h-3 w-full overflow-hidden rounded-full bg-line">
-          <div className={"h-full rounded-full bg-accent transition-all duration-500 "+(progressPercent===null?"w-1/4 animate-pulse":"")}
-            style={progressPercent===null?undefined:{width:progressPercent+"%"}} />
+          <div className={"photo-scan-fill "+(progressPercent===null&&scanActive?"photo-scan-indeterminate":"")}
+            style={{transform:progressPercent===null&&scanActive?undefined:`scaleX(${progressPercent===null?(foundCount?Math.min(1,doneCount/foundCount):0):progressPercent/100})`}} />
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {[
@@ -355,19 +404,19 @@ export default function PhotoDataPage() {
           </button>
         </div>
       </div>
-      {mode==="columns"?<div className="space-y-3">
+      {mode==="columns"?<div key="columns" className="photo-view-enter space-y-3">
         <div className="flex gap-3 overflow-x-auto pb-2">
-          {columns.map(col=><div key={col.id} className="shrink-0 w-56 rounded-xl border border-line bg-panelAlt/60 p-3 space-y-2">
+          {columns.map(col=><div key={col.id} className="photo-view-enter shrink-0 w-56 rounded-xl border border-line bg-panelAlt/60 p-3 space-y-2">
             <div className="flex items-center gap-1">
               <select className="input min-w-0 flex-1" aria-label="列字段" value={col.field}
                 onChange={e=>{setColumns(items=>items.map(item=>item.id===col.id?{...item,field:e.target.value,selected:[]}:item));setPage(0);}}>
                 {fields.map(f=><option key={f.field_id} value={f.field_id}>{f.label}</option>)}
               </select>
               <button type="button" aria-label="移除筛选列" className="button-secondary px-2"
-                disabled={columns.length===1} onClick={()=>setColumns(items=>items.filter(x=>x.id!==col.id))}>×</button>
+                disabled={columns.length===1} onClick={()=>{setColumns(items=>items.filter(x=>x.id!==col.id));setPage(0);}}>×</button>
             </div>
             <div className="max-h-52 overflow-y-auto space-y-1">
-              {(facets[col.id]?.options??[]).map(item=>{
+              {(facets[col.id]?.field===col.field?facets[col.id].options:[]).map(item=>{
                 const key=item.value==null?"__MISSING__":String(item.value);
                 return <label className="flex gap-2 items-center text-xs cursor-pointer" key={key}>
                   <input type="checkbox" checked={col.selected.includes(key)}
@@ -378,7 +427,7 @@ export default function PhotoDataPage() {
                   <span className="text-textSecondary">{item.count}</span>
                 </label>;
               })}
-              {!(facets[col.id]?.options.length)?<p className="text-xs text-textSecondary">当前无选项</p>:null}
+              {!(facets[col.id]?.field===col.field&&facets[col.id].options.length)?<p className="text-xs text-textSecondary">当前无选项</p>:null}
             </div>
           </div>)}
           {columns.length<8?<button className="button-secondary shrink-0 self-start" type="button"
@@ -388,7 +437,7 @@ export default function PhotoDataPage() {
           </button>:null}
         </div>
         <p className="text-xs text-textSecondary">已选 {selectedCount} 项。高级条件始终叠加生效，切换视图不会清除高级规则。</p>
-      </div>:<div className="space-y-3">
+      </div>:<div key="advanced" className="photo-view-enter space-y-3">
         <p className="text-sm text-textSecondary">条件组可以嵌套 AND / OR / NOT；与元数据列条件同时生效。</p>
         <AdvancedRules rule={advanced} fields={fields} onChange={node=>{setAdvanced(node);setPage(0);}}/>
       </div>}
@@ -410,7 +459,7 @@ export default function PhotoDataPage() {
 
     <PhotoAnalyticsDashboard filter={filter} refresh={refresh} onApplyRules={applyChartFilter}/>
 
-    <section className="panel p-5 overflow-x-auto">
+    <section className="panel p-5 overflow-x-auto photo-results" aria-busy={loading}>
       <div className="flex items-center justify-between gap-3">
         <div><div className="dashboard-kicker">Indexed Files</div>
           <h2 className="mt-1 text-xl font-semibold text-textPrimary">文件元数据</h2></div>
@@ -432,12 +481,13 @@ export default function PhotoDataPage() {
           <td className="px-2 py-3">{(file.size_bytes/1048576).toFixed(1)} MiB</td>
         </tr>)}</tbody>
       </table>
-      {!results?.items.length?<p className="py-6 text-center text-sm text-textSecondary">没有匹配的索引照片。</p>:null}
+      {loading?<p role="status" className="text-xs text-accent mt-3">正在更新文件结果…</p>:null}
+      {!loading&&!results?.items.length?<p className="py-6 text-center text-sm text-textSecondary">没有匹配的索引照片。</p>:null}
       <div className="flex justify-between items-center mt-4">
-        <button className="button-secondary" type="button" disabled={page===0}
+        <button className="button-secondary" type="button" disabled={loading||page===0}
           onClick={()=>setPage(x=>Math.max(0,x-1))}>上一页</button>
         <span className="text-xs text-textSecondary">第 {page+1} 页</span>
-        <button className="button-secondary" type="button" disabled={!results||results.total_files<=(page+1)*40}
+        <button className="button-secondary" type="button" disabled={loading||!results||results.total_files<=(page+1)*40}
           onClick={()=>setPage(x=>x+1)}>下一页</button>
       </div>
     </section>

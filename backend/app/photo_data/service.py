@@ -61,7 +61,7 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "capture.month": ("substr(shot_at,1,7)", "enum", "拍摄年月"),
     "capture.date": ("substr(shot_at,1,10)", "date", "拍摄日期"),
     "capture.hour": ("substr(shot_at,12,2)", "enum", "拍摄小时"),
-    "capture.weekday": ("(CAST(strftime('%w',shot_at) AS INTEGER)+6)%7", "enum", "星期（周一为0）"),
+    "capture.weekday": ("(CAST(strftime('%w',shot_at) AS INTEGER)+6)%7", "number", "星期（周一为0）"),
     "camera.make": ("camera_make", "enum", "相机品牌"),
     "camera.model_norm": ("camera_norm", "enum", "相机型号"),
     "lens.model_norm": ("lens_norm", "enum", "镜头型号"),
@@ -309,6 +309,7 @@ def field_registry() -> list[dict]:
 
 
 def _where_node(node: dict, params: list, depth: int = 0) -> str:
+    if not isinstance(node, dict): raise ValueError("筛选规则必须是对象")
     if depth > 5: raise ValueError("筛选规则嵌套过深")
     if "group" in node and isinstance(node["group"], dict):
         return _where_node(node["group"], params, depth + 1)
@@ -332,10 +333,16 @@ def _where_node(node: dict, params: list, depth: int = 0) -> str:
     if op in ("in", "not_in"):
         if not isinstance(value, list) or not value or len(value) > 500: raise ValueError("IN 条件必须提供1至500项")
         if any(not isinstance(v, (str,int,float)) for v in value): raise ValueError("IN 条件值无效")
+        if kind == "number" and any(not isinstance(v, (int, float)) or isinstance(v, bool) for v in value):
+            raise ValueError("数值字段必须使用数字比较")
         params.extend(value)
         return col + (" IN " if op == "in" else " NOT IN ") + "(" + ",".join("?" for _ in value) + ")"
     if op == "between":
         if not isinstance(value, list) or len(value) != 2: raise ValueError("between 需要两个端点")
+        if any(not isinstance(v, (str, int, float)) or isinstance(v, bool) for v in value):
+            raise ValueError("between 端点值无效")
+        if kind == "number" and any(not isinstance(v, (int, float)) for v in value):
+            raise ValueError("数值字段必须使用数字比较")
         params.extend(value)
         return "(" + col + " BETWEEN ? AND ?)"
     if isinstance(value, (dict, list)) or value is None or len(str(value)) > 256:
@@ -383,6 +390,7 @@ def query(filter_ast: dict | None = None, limit: int = 100, offset: int = 0) -> 
 def facets(filter_ast: dict | None, field_id: str, limit: int = 100) -> dict:
     if field_id not in FIELDS or not 1 <= limit <= 200:
         raise ValueError("无效的分面字段或大小")
+    compile_filter(filter_ast)
     # Removing a top-level column predicate gives Lightroom-style self-excluding facets.
     filter_copy = json.loads(json.dumps(filter_ast)) if filter_ast else {}
     group = filter_copy.get("group")

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
@@ -8,6 +8,14 @@ import {
   type AnalyticsHeatCell, type AnalyticsPoint, type PhotoAnalytics,
   type PhotoFilter, type PhotoRule
 } from "../../api/photoData";
+
+import { useAppSettings } from "../layout/AppSettingsProvider";
+
+const ChartMotion = createContext(false);
+function useChartMotion() {
+  const reduced = useContext(ChartMotion);
+  return { isAnimationActive: !reduced, animationDuration: 420, animationBegin: 0, animationEasing: "ease-out" as const };
+}
 
 type Tab = "overview" | "gear" | "exposure" | "timeline" | "files";
 const tabs: { id: Tab; label: string }[] = [
@@ -31,7 +39,7 @@ const hint = "点击图表可叠加筛选条件";
 function Panel({title,desc,children,wide=false}:{
   title:string;desc:string;children:ReactNode;wide?:boolean;
 }) {
-  return <section className={"panel p-4 sm:p-5 min-w-0 "+(wide?"lg:col-span-2":"")}>
+  return <section className={"photo-chart-panel panel p-4 sm:p-5 min-w-0 "+(wide?"lg:col-span-2":"")}>
     <h3 className="text-base font-semibold text-textPrimary">{title}</h3>
     <p className="mt-1 text-xs leading-5 text-textSecondary">{desc}</p>
     <div className="mt-4">{children}</div>
@@ -42,6 +50,7 @@ function NoData(){return <div className="h-48 flex items-center justify-center t
 function Trend({title,desc,items,field,choose}:{
   title:string;desc:string;items:AnalyticsPoint[];field:string;choose:(field:string,name:string)=>void;
 }) {
+  const motion = useChartMotion();
   const shown=items.slice(-100);
   return <Panel title={title} desc={desc}>
     {shown.length?<div className="w-full h-60"><ResponsiveContainer width="100%" height="100%">
@@ -50,7 +59,7 @@ function Trend({title,desc,items,field,choose}:{
         <XAxis dataKey="key" tick={{fontSize:10}} minTickGap={20}/>
         <YAxis allowDecimals={false} tick={{fontSize:10}}/>
         <Tooltip formatter={value=>[count(Number(value)),"拍摄次数"]}/>
-        <Bar dataKey="count" fill={colors[0]} maxBarSize={34} cursor="pointer"
+        <Bar {...motion} dataKey="count" fill={colors[0]} maxBarSize={34} cursor="pointer"
           onClick={e=>{const item=(e as {payload?:AnalyticsPoint}).payload;if(item)choose(field,item.key);}}/>
       </BarChart>
     </ResponsiveContainer></div>:<NoData/>}
@@ -60,6 +69,7 @@ function Trend({title,desc,items,field,choose}:{
 function Ranking({title,desc,items,onChoose,max=12}:{
   title:string;desc:string;items:AnalyticsCount[];onChoose?:(name:string)=>void;max?:number;
 }) {
+  const motion = useChartMotion();
   const shown=items.slice(0,max);
   return <Panel title={title} desc={desc}>
     {shown.length?<div style={{height:Math.max(210,shown.length*29+40)}}>
@@ -70,7 +80,7 @@ function Ranking({title,desc,items,onChoose,max=12}:{
           <YAxis type="category" dataKey="short" tick={{fontSize:10}} width={112}/>
           <Tooltip formatter={v=>[count(Number(v)),"次"]}
             labelFormatter={(_,p)=>String((p[0]?.payload as AnalyticsCount|undefined)?.name||"")}/>
-          <Bar dataKey="count" fill={colors[0]} radius={[0,3,3,0]}
+          <Bar {...motion} dataKey="count" fill={colors[0]} radius={[0,3,3,0]}
             cursor={onChoose?"pointer":"default"} onClick={e=>{
               const item=(e as {payload?:AnalyticsCount}).payload;
               if(item?.name)onChoose?.(item.name);
@@ -84,6 +94,7 @@ function Ranking({title,desc,items,onChoose,max=12}:{
 function Buckets({title,desc,items,onChoose}:{
   title:string;desc:string;items:AnalyticsBucket[];onChoose?:(b:AnalyticsBucket)=>void;
 }) {
+  const motion = useChartMotion();
   return <Panel title={title} desc={desc}>
     {items.some(b=>b.count>0)?<div className="h-64"><ResponsiveContainer width="100%" height="100%">
       <BarChart data={items} margin={{top:5,right:5,bottom:5,left:-24}}>
@@ -91,7 +102,7 @@ function Buckets({title,desc,items,onChoose}:{
         <XAxis dataKey="label" tick={{fontSize:9}} angle={-35} textAnchor="end" height={68} interval="preserveStartEnd"/>
         <YAxis allowDecimals={false} tick={{fontSize:10}}/>
         <Tooltip formatter={v=>[count(Number(v)),"次数"]}/>
-        <Bar dataKey="count" fill={colors[2]} maxBarSize={40} cursor={onChoose?"pointer":"default"}
+        <Bar {...motion} dataKey="count" fill={colors[2]} maxBarSize={40} cursor={onChoose?"pointer":"default"}
           onClick={e=>{const b=(e as {payload?:AnalyticsBucket}).payload;if(b)onChoose?.(b);}}/>
       </BarChart>
     </ResponsiveContainer></div>:<NoData/>}
@@ -101,12 +112,13 @@ function Buckets({title,desc,items,onChoose}:{
 function Donut({title,desc,items,onChoose}:{
   title:string;desc:string;items:AnalyticsCount[];onChoose?:(name:string)=>void;
 }) {
+  const motion = useChartMotion();
   const shown=items.filter(x=>x.count>0).slice(0,12);
   const total=shown.reduce((s,x)=>s+x.count,0);
   return <Panel title={title} desc={desc}>
     {shown.length?<div className="grid sm:grid-cols-[175px_1fr] gap-3 items-center">
       <div className="h-48"><ResponsiveContainer width="100%" height="100%">
-        <PieChart><Pie data={shown} dataKey="count" nameKey="name"
+        <PieChart><Pie {...motion} data={shown} dataKey="count" nameKey="name"
           cx="50%" cy="50%" innerRadius={46} outerRadius={78} paddingAngle={2} stroke="none">
           {shown.map((_,i)=><Cell key={i} fill={colors[i%colors.length]}/>)}
         </Pie><Tooltip formatter={v=>[count(Number(v)),"次数"]}/></PieChart>
@@ -195,6 +207,7 @@ function CameraByYear({data,cameras,onChoose}:{
   data:PhotoAnalytics["gear"]["camera_years"];cameras:AnalyticsCount[];
   onChoose:(name:string)=>void;
 }) {
+  const motion = useChartMotion();
   const top=cameras.filter(x=>x.name!=="未记录").slice(0,6).map(x=>x.name);
   const years=[...new Set(data.map(d=>d.year))].sort();
   const series=years.map(year=>{
@@ -210,7 +223,7 @@ function CameraByYear({data,cameras,onChoose}:{
           <XAxis dataKey="year" tick={{fontSize:11}}/>
           <YAxis allowDecimals={false} tick={{fontSize:10}}/>
           <Tooltip formatter={v=>[count(Number(v)),"拍摄次数"]}/><Legend/>
-          {top.map((name,i)=><Area key={name} dataKey={"series"+i}
+          {top.map((name,i)=><Area {...motion} key={name} dataKey={"series"+i}
             name={short(name,22)} stackId="1" type="monotone"
             stroke={colors[i%colors.length]} fill={colors[i%colors.length]} fillOpacity={0.65}/>)}
         </AreaChart>
@@ -233,15 +246,16 @@ function Coverage({records,filterMissing}:{
           <span>{count(r.count)} / {count(r.total)} · {ratio(r.count,r.total)}</span>
         </div>
         <div className="rounded-full h-2 bg-panelAlt overflow-hidden">
-          <div className="h-full rounded-full bg-accent" style={{width:100*r.count/r.total+"%"}}/>
+          <div className="photo-scan-fill" style={{transform:`scaleX(${r.total?r.count/r.total:0})`}}/>
         </div>
       </button>)}
     </div>:<NoData/>}
   </Panel>;
 }
-export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules}:{
+export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}:{
   filter:PhotoFilter;refresh:number;onApplyRules:(rules:PhotoRule[])=>void;
 }) {
+  const { reduceMotion } = useAppSettings();
   const [tab,setTab]=useState<Tab>("overview");
   const [data,setData]=useState<PhotoAnalytics|null>(null);
   const [loading,setLoading]=useState(true);
@@ -254,13 +268,14 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules}:{
     return ()=>{active=false;};
   },[serialized,refresh]);
   const d=data;
+  const onApplyRules=(rules:PhotoRule[])=>{if(!loading&&!error)applyRules(rules);};
   const choose=(field:string,name:string)=>onApplyRules(fieldRules(field,name));
   const bin=(b:AnalyticsBucket)=>onApplyRules(rangeRules(b.field,b.min,b.max));
   const isoRanges:[[number|null,number|null],...(number|null)[][]]=[[null,200],[200,800],[800,3200],[3200,12800],[12800,null]];
   const shutterRanges:[[number|null,number|null],...(number|null)[][]]=[[null,.001],[.001,.01],[.01,.1],[.1,1],[1,null]];
   const focalRanges:[[number|null,number|null],...(number|null)[][]]=[[null,24],[24,50],[50,100],[100,200],[200,null]];
   const apRanges:[[number|null,number|null],...(number|null)[][]]=[[null,2],[2,4],[4,8],[8,16],[16,null]];
-  return <section className="space-y-4">
+  return <ChartMotion.Provider value={reduceMotion}><section className="space-y-4" aria-busy={loading}>
     <div className="flex flex-wrap justify-between gap-3 items-end">
       <div><div className="dashboard-kicker">Photography Analytics</div>
         <h2 className="text-2xl font-semibold text-textPrimary mt-1">拍摄数据分析</h2>
@@ -269,13 +284,29 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules}:{
       <span className="text-xs text-textSecondary">统计快照：{d?.as_of?new Date(d.as_of).toLocaleString("zh-CN"):"尚未扫描"}</span>
     </div>
     <div className="flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="图表类别">
-      {tabs.map(t=><button key={t.id} type="button" role="tab" aria-selected={tab===t.id}
+      {tabs.map(t=><button key={t.id} type="button" role="tab" id={"photo-tab-"+t.id} aria-controls={"photo-panel-"+t.id}
+        tabIndex={tab===t.id?0:-1} aria-selected={tab===t.id}
         className={"shrink-0 "+(tab===t.id?"button-primary":"button-secondary")}
-        onClick={()=>setTab(t.id)}>{t.label}</button>)}
+        onClick={()=>setTab(t.id)} onKeyDown={e=>{
+          const index=tabs.findIndex(item=>item.id===tab);
+          const next=e.key==="ArrowRight"?(index+1)%tabs.length:e.key==="ArrowLeft"?(index+tabs.length-1)%tabs.length:
+            e.key==="Home"?0:e.key==="End"?tabs.length-1:null;
+          if(next===null)return;
+          e.preventDefault();setTab(tabs[next].id);
+          document.getElementById("photo-tab-"+tabs[next].id)?.focus();
+        }}>{t.label}</button>)}
     </div>
     {error?<div role="alert" className="panel p-4 text-danger">{error}</div>:null}
-    {loading?<div role="status" className="panel p-8 text-center text-textSecondary">正在聚合统计图表…</div>:null}
-    {!loading&&d?<div role="tabpanel" className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="photo-loading-slot" role="status" aria-live="polite">
+      {loading?<span className="inline-flex items-center gap-2 text-xs text-accent">
+        <span className="photo-loading-dot" aria-hidden="true"/>{d?"正在更新图表，保留上一份统计…":"正在聚合统计图表…"}
+      </span>:null}
+    </div>
+    {loading&&!d?<div className="photo-skeleton-grid" aria-hidden="true">
+      {Array.from({length:4},(_,i)=><div key={i} className="panel photo-skeleton"/>)}
+    </div>:null}
+    {!error&&d?<div key={tab} id={"photo-panel-"+tab} aria-labelledby={"photo-tab-"+tab} role="tabpanel"
+      className={"photo-chart-grid grid grid-cols-1 lg:grid-cols-2 gap-4 "+(loading?"photo-chart-refreshing":"")} tabIndex={0}>
       {tab==="overview"&&<>
         <Panel wide title="图库指标" desc="真实照片文件数与逻辑快门次数严格分开统计">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -399,7 +430,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules}:{
       图表统计使用最后一次成功发布的 SQLite 索引，不访问原片。不分析 GPS 或图像像素。
       日期使用相机记录的本地时间，不推算拍摄时区。镜头信息缺失不会被猜测填补。
     </p>
-  </section>;
+  </section></ChartMotion.Provider>;
 }
 
 function GearMatrix({cameras,lenses,data,onChoose}:{

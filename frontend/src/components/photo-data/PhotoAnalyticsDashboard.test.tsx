@@ -1,8 +1,11 @@
 import "@testing-library/jest-dom";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPhotoAnalytics, type PhotoAnalytics, type PhotoFilter } from "../../api/photoData";
 import { PhotoAnalyticsDashboard } from "./PhotoAnalyticsDashboard";
+import { useAppSettings } from "../layout/AppSettingsProvider";
+
+vi.mock("../layout/AppSettingsProvider", () => ({ useAppSettings: vi.fn() }));
 
 vi.mock("../../api/photoData", () => ({
   getPhotoAnalytics: vi.fn()
@@ -52,13 +55,17 @@ const empty = ():PhotoAnalytics => ({
   }
 });
 describe("PhotoAnalyticsDashboard",()=>{
+  afterEach(()=>vi.restoreAllMocks());
   beforeEach(()=>{
+    vi.mocked(useAppSettings).mockReturnValue({reduceMotion:false} as ReturnType<typeof useAppSettings>);
     // Recharts ResponsiveContainer relies on a browser observer that jsdom lacks.
     vi.stubGlobal("ResizeObserver", class {
-      observe() {}
+      constructor(private callback: ResizeObserverCallback) {}
+      observe(target: Element) { this.callback([{contentRect:{width:600,height:280},target} as ResizeObserverEntry], this as unknown as ResizeObserver); }
       unobserve() {}
       disconnect() {}
     });
+    vi.spyOn(HTMLElement.prototype,"getBoundingClientRect").mockReturnValue({width:600,height:280,top:0,left:0,right:600,bottom:280,x:0,y:0,toJSON:()=>({})});
     vi.mocked(getPhotoAnalytics).mockReset();
     vi.mocked(getPhotoAnalytics).mockResolvedValue(empty());
   });
@@ -99,5 +106,43 @@ describe("PhotoAnalyticsDashboard",()=>{
     expect(onApplyRules).toHaveBeenCalledWith([
       {field:"capture.date",op:"eq",value:"2025-03-17"}
     ]);
+  });
+  it("keeps chart nodes during refresh and ignores stale chart interactions",async()=>{
+    const onApplyRules=vi.fn();
+    const {rerender}=render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"曝光与焦距"}));
+    const panel=screen.getByRole("tabpanel");
+    let resolve!:(value:PhotoAnalytics)=>void;
+    vi.mocked(getPhotoAnalytics).mockReturnValueOnce(new Promise(r=>{resolve=r;}));
+    rerender(<PhotoAnalyticsDashboard filter={filter} refresh={1} onApplyRules={onApplyRules}/>);
+    expect(screen.getByRole("tabpanel")).toBe(panel);
+    expect(screen.getByRole("status")).toHaveTextContent("正在更新图表");
+    fireEvent.click(screen.getByRole("button",{name:/1\/100–1\/10s × 200–799/}));
+    expect(onApplyRules).not.toHaveBeenCalled();
+    await act(async()=>resolve(empty()));
+    expect(screen.getByRole("tabpanel")).toBe(panel);
+    expect(panel).not.toHaveClass("photo-chart-refreshing");
+  });
+  it("supports keyboard navigation and labels each tab panel",async()=>{
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={vi.fn()}/>);
+    await screen.findByText("图库指标");
+    const overview=screen.getByRole("tab",{name:"总览"});
+    overview.focus();fireEvent.keyDown(overview,{key:"ArrowRight"});
+    expect(screen.getByRole("tab",{name:"器材与组合"})).toHaveFocus();
+    expect(screen.getByRole("tabpanel",{name:"器材与组合"})).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement!,{key:"End"});
+    expect(screen.getByRole("tabpanel",{name:"文件与质量"})).toBeInTheDocument();
+  });
+  it("renders reduced-motion charts without delaying interaction",async()=>{
+    vi.mocked(useAppSettings).mockReturnValue({reduceMotion:true} as ReturnType<typeof useAppSettings>);
+    const onApplyRules=vi.fn();
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    // Real SVG bars are rendered by the sized observer, rather than bypassing Recharts.
+    const bar=document.querySelector(".recharts-bar-rectangle path");
+    expect(bar).not.toBeNull();
+    fireEvent.click(bar!);
+    expect(onApplyRules).toHaveBeenCalledWith([{field:"capture.year",op:"eq",value:"2025"}]);
   });
 });

@@ -10,6 +10,7 @@ export default function PhotoUsageLeaderboard() {
   const [to,setTo]=useState("");
   const [data,setData]=useState<UsageLeaderboard|null>(null);
   const [error,setError]=useState("");
+  const [loading,setLoading]=useState(true);
   const filter=useMemo(()=>{
     const result=emptyPhotoFilter();
     if("children" in result.group) {
@@ -20,9 +21,9 @@ export default function PhotoUsageLeaderboard() {
   },[from,to]);
 
   useEffect(()=>{
-    let active=true;setError("");
-    void getPhotoUsage(kind,filter,sort_order).then(d=>{if(active)setData(d);})
-      .catch(e=>{if(active)setError(String(e));});
+    let active=true;setError("");setLoading(true);
+    void getPhotoUsage(kind,filter,sort_order).then(d=>{if(active){setData(d);setLoading(false);}})
+      .catch(e=>{if(active){setError(String(e));setLoading(false);}});
     return ()=>{active=false;};
   },[kind,sort_order,filter]);
 
@@ -33,10 +34,10 @@ export default function PhotoUsageLeaderboard() {
     setParams(query);
   }
   function destination(model:string) {
-    return "/photo-data?"+(kind==="camera"?"camera":"lens")+"="+encodeURIComponent(model);
+    return "/photo-data?"+((data?.kind??kind)==="camera"?"camera":"lens")+"="+encodeURIComponent(model);
   }
   const items=data?.items||[];
-  return <div className="space-y-6">
+  return <div className="space-y-6" aria-busy={loading}>
     <section className="leaderboard-hero panel p-6 space-y-4">
       <div className="dashboard-kicker">Photo Usage · Geargrade 1.0.0</div>
       <h1 className="text-3xl font-black text-textPrimary">拍摄使用量榜</h1>
@@ -67,17 +68,22 @@ export default function PhotoUsageLeaderboard() {
       </p>
     </section>
     {error?<div className="panel p-4 text-danger" role="alert">{error}</div>:null}
-    <section className="panel p-6">
+    <div className="photo-loading-slot" role="status">{loading?<span className="text-xs text-accent">正在更新拍摄使用量榜…</span>:null}</div>
+    <section className={"panel p-6 "+(loading?"photo-chart-refreshing":"")}>
       <h2 className="text-2xl font-semibold text-textPrimary">Top 3</h2>
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      <div className="photo-usage-podium mt-5 grid gap-4 lg:grid-cols-3">
         {items.slice(0,3).map((item,i)=><Link key={item.canonical_key} to={destination(item.canonical_key)}
-          className={"podium-card "+["podium-rank-1","podium-rank-2","podium-rank-3"][i]}>
+          aria-disabled={loading||!!error} onClick={e=>{if(loading||error)e.preventDefault();}}
+          className={"podium-card photo-view-enter "+["podium-rank-1","podium-rank-2","podium-rank-3"][i]}>
           <span className="podium-badge">TOP #{item.rank}</span>
           <div className="mt-12 text-2xl font-semibold text-textPrimary break-words">{item.name}</div>
           <div className="podium-headline mt-8">{item.capture_count.toLocaleString()} 次</div>
           <p className="mt-2 text-sm text-textSecondary">{(item.usage_share*100).toFixed(1)}% · 活跃 {item.active_days} 天</p>
+          <div className="mt-4 h-1.5 rounded-full bg-line overflow-hidden" aria-hidden="true">
+            <div className="photo-scan-fill" style={{transform:`scaleX(${item.usage_share})`}}/>
+          </div>
         </Link>)}
-        {!items.length?<div className="lg:col-span-3 text-sm text-textSecondary p-6">
+        {!loading&&!error&&!items.length?<div className="lg:col-span-3 text-sm text-textSecondary p-6">
           尚无可识别的拍摄数据。请先在设置里添加只读照片目录并主动扫描。
         </div>:null}
       </div>
@@ -85,6 +91,7 @@ export default function PhotoUsageLeaderboard() {
     {items.length>3?<section className="panel p-6 space-y-3">
       <h2 className="text-2xl font-semibold text-textPrimary">完整排名</h2>
       {items.slice(3).map(item=><Link key={item.canonical_key} to={destination(item.canonical_key)}
+        aria-disabled={loading||!!error} onClick={e=>{if(loading||error)e.preventDefault();}}
         className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line p-4 hover:bg-panelAlt">
         <div className="text-textPrimary">#{item.rank} · {item.name}</div>
         <div className="text-textSecondary text-sm">{item.capture_count.toLocaleString()} 次 · {(item.usage_share*100).toFixed(1)}%</div>

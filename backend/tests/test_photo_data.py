@@ -293,3 +293,93 @@ def test_analytics_source_filter_cannot_execute_sql(photo_env):
         analyze({"version":"photo-filter.v1","group":{
             "field":"camera_norm); DELETE FROM photos;--",
             "op":"eq","value":"Sony"}})
+
+
+def test_incremental_retries_failed_metadata_without_file_changes(photo_env, monkeypatch):
+    (photo_env / "retry.arw").write_bytes(b"raw")
+    sid = service.add_source({"name": "Retry", "root_path": str(photo_env)})["id"]
+    monkeypatch.setattr(service, "extract_batch", lambda paths: [{"Error": "temporary failure"} for _ in paths])
+    assert complete(service.launch_scan([sid]))["failed"] == 1
+    monkeypatch.setattr(service, "extract_batch", fake_exif)
+    retried = complete(service.launch_scan([sid]))
+    assert retried["status"] == "completed"
+    assert retried["extracted"] == 1 and retried["unchanged"] == 0
+    assert service.query()["items"][0]["parse_status"] == "ok"
+
+
+def test_removed_count_accumulates_across_sources(photo_env, monkeypatch):
+    second_root = photo_env.parent / "second"
+    second_root.mkdir()
+    for root in (photo_env, second_root):
+        for name in ("keep.arw", "remove.arw"):
+            (root / name).write_bytes(b"raw")
+    monkeypatch.setattr(service, "extract_batch", fake_exif)
+    ids = [service.add_source({"name": root.name, "root_path": str(root)})["id"]
+           for root in (photo_env, second_root)]
+    assert complete(service.launch_scan(ids))["status"] == "completed"
+    for root in (photo_env, second_root):
+        (root / "remove.arw").unlink()
+    result = complete(service.launch_scan(ids))
+    assert result["status"] == "completed"
+    assert result["removed"] == 2
+    assert service.summary()["physical_files"] == 2
+
+
+def test_weekday_numeric_filter_and_self_excluding_facets(photo_env, monkeypatch):
+    for name in ("a.arw", "a.jpg"):
+        (photo_env / name).write_bytes(b"raw")
+    monkeypatch.setattr(service, "extract_batch", fake_exif)
+    sid = service.add_source({"name": "Weekdays", "root_path": str(photo_env)})["id"]
+    assert complete(service.launch_scan([sid]))["status"] == "completed"
+    field = next(f for f in service.field_registry() if f["field_id"] == "capture.weekday")
+    assert field["value_type"] == "number"
+    condition = {"version": "photo-filter.v1", "group": {"op": "and", "children": [
+        {"field": "capture.weekday", "op": "in", "value": [3], "column_id": "capture.weekday"}
+    ]}}
+    assert service.query(condition)["total_captures"] == 1
+    assert service.facets(condition, "capture.weekday")["options"] == [{"value": 3, "count": 1}]
+
+
+@pytest.mark.parametrize("rule", [
+    None, [], {"op": "and", "children": [None]},
+    {"field": "exposure.iso", "op": "in", "value": ["1600"]},
+    {"field": "exposure.iso", "op": "between", "value": [{}, 3200]},
+    {"field": "exposure.iso", "op": "between", "value": ["100", "3200"]},
+])
+def test_invalid_filter_shapes_return_validation_error(photo_env, rule):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from app.api.routes.photo_data import router
+    app = FastAPI()
+    app.include_router(router)
+    with TestClient(app) as client:
+        response = client.post("/photo-data/query", json={"filter": {"group": rule}})
+    assert response.status_code == 422
+
+
+def test_cancelled_scan_keeps_last_published_snapshot(photo_env, monkeypatch):
+    import threading
+    for name in ("a.arw", "b.arw"):
+        (photo_env / name).write_bytes(b"raw")
+    monkeypatch.setattr(service, "extract_batch", fake_exif)
+    sid = service.add_source({"name": "Cancel", "root_path": str(photo_env)})["id"]
+    assert complete(service.launch_scan([sid]))["status"] == "completed"
+    before = service.summary()
+    started, release = threading.Event(), threading.Event()
+    def blocked_exif(paths):
+        started.set()
+        assert release.wait(5)
+        return fake_exif(paths)
+    monkeypatch.setattr(service, "extract_batch", blocked_exif)
+    job = service.launch_scan([sid], deep=True)
+    try:
+        assert started.wait(5)
+        service.cancel_scan(job)
+    finally:
+        release.set()
+    result = complete(job)
+    assert result["status"] == "cancelled"
+    assert result["active_workers"] == 0
+    assert service.summary() == before
+    with db.connect() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM scan_seen").fetchone()[0] == 0

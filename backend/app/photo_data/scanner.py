@@ -95,7 +95,7 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
 
     with connect() as db:
         progress: dict[str, Any] = {
-            "seen": 0, "extracted": 0, "unchanged": 0, "failed": 0,
+            "seen": 0, "extracted": 0, "unchanged": 0, "failed": 0, "removed": 0,
             "processed": 0, "directories_seen": 0, "total_candidates": 0,
             "phase": "preflight", "workers": 0, "active_workers": 0,
             "enumeration_done": 0, "rate_files_per_sec": 0.0,
@@ -136,9 +136,9 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                 progress["enumeration_done"] = 0
                 report(True)
                 existing = {
-                    row["relpath"]: (row["size_bytes"], row["mtime_ns"])
+                    row["relpath"]: (row["size_bytes"], row["mtime_ns"], row["parse_status"])
                     for row in db.execute(
-                        "SELECT relpath,size_bytes,mtime_ns FROM photos WHERE source_id=?", (source_id,)
+                        "SELECT relpath,size_bytes,mtime_ns,parse_status FROM photos WHERE source_id=?", (source_id,)
                     )
                 }
                 staged = 0
@@ -163,7 +163,10 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                     nonlocal failures_since_adjust, current_limit
                     if not futures:
                         return
-                    ready, _ = wait(set(futures), return_when=FIRST_COMPLETED)
+                    ready, _ = wait(set(futures), timeout=0.25, return_when=FIRST_COMPLETED)
+                    report()
+                    if cancelled():
+                        raise InterruptedError("用户取消扫描")
                     for future in ready:
                         batch, submitted = futures.pop(future)
                         progress["active_workers"] = len(futures)
@@ -240,7 +243,7 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                         rel = os.path.relpath(entry.path, root).replace(os.sep, "/")
                         progress["seen"] += 1
                         prior = existing.get(rel)
-                        if not deep and prior == (st.st_size, st.st_mtime_ns):
+                        if not deep and prior == (st.st_size, st.st_mtime_ns, "ok"):
                             stage(rel, {})
                             progress["unchanged"] += 1
                         else:
@@ -313,7 +316,7 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                         "UPDATE sources SET last_success=?, last_run_id=? WHERE id=?",
                         (s.now(), run_id, source_id),
                     )
-                    progress["removed"] = missing
+                    progress["removed"] += missing
                     db.execute("DELETE FROM scan_seen WHERE run_id=? AND source_id=?", (run_id, source_id))
                 progress["phase"] = "completed_source"
                 report(True)
@@ -324,12 +327,12 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
         except InterruptedError as exc:
             db.rollback()
             s._run_update(db, run_id, status="cancelled", phase="cancelled",
-                          ended_at=s.now(), error=str(exc)[:1200])
+                          active_workers=0, ended_at=s.now(), error=str(exc)[:1200])
             db.execute("DELETE FROM scan_seen WHERE run_id=?", (run_id,))
             db.commit()
         except Exception as exc:
             db.rollback()
             s._run_update(db, run_id, status="failed", phase="failed",
-                          ended_at=s.now(), error=str(exc)[:1200])
+                          active_workers=0, ended_at=s.now(), error=str(exc)[:1200])
             db.execute("DELETE FROM scan_seen WHERE run_id=?", (run_id,))
             db.commit()
