@@ -33,7 +33,12 @@ export function PhotoMetadataExplorer({results,loading,page,pageSize,onPageChang
       }
     };
     document.addEventListener("keydown",onKey);
-    return ()=>document.removeEventListener("keydown",onKey);
+    const before=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    return ()=>{
+      document.removeEventListener("keydown",onKey);
+      document.body.style.overflow=before;
+    };
   },[selected]);
   const total=results?.total_files??0;
   const start=total?page*pageSize+1:0;
@@ -88,8 +93,8 @@ export function PhotoMetadataExplorer({results,loading,page,pageSize,onPageChang
         <tbody>{!loading&&results?.items.map(item=><tr key={item.id} className="border-t border-line/50 text-textPrimary hover:bg-panelAlt/55">
           <td className="px-4 py-3 max-w-52">
             <button type="button" className="text-left max-w-full truncate text-accent hover:underline focus-visible:underline"
-              title={item.relpath} ref={selected?.id===item.id?originRef:undefined}
-              onClick={()=>setSelected(item)} aria-label={"查看元数据："+item.filename}>{item.filename}</button>
+              title={item.relpath}
+              onClick={e=>{originRef.current=e.currentTarget;setSelected(item);}} aria-label={"查看元数据："+item.filename}>{item.filename}</button>
           </td>
           <td className="px-4 py-3 whitespace-nowrap">{item.shot_at?.slice(0,16)||"—"}</td>
           <td className="px-4 py-3">{item.camera_model||"—"}</td>
