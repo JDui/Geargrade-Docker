@@ -381,8 +381,14 @@ def test_cancelled_scan_keeps_last_published_snapshot(photo_env, monkeypatch):
     assert result["status"] == "cancelled"
     assert result["active_workers"] == 0
     assert service.summary() == before
+    # v2 keeps staging outside the main DB; no temporary records remain.
     with db.connect() as conn:
-        assert conn.execute("SELECT COUNT(*) FROM scan_seen").fetchone()[0] == 0
+        assert not conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='scan_seen'"
+        ).fetchone()
+    assert not list(db.database_path().parent.glob(
+        db.database_path().stem + ".scan-stage-*.sqlite"
+    ))
 
 
 def test_metadata_explorer_path_search_uses_index_and_escapes_like(photo_env, monkeypatch):
@@ -409,3 +415,114 @@ def test_metadata_explorer_path_search_uses_index_and_escapes_like(photo_env, mo
         raise AssertionError("file search must not access original photos")
     monkeypatch.setattr(os, "scandir", forbidden)
     assert service.query(search("Vacation"))["total_files"] == 1
+
+
+def test_v1_database_opt_in_migration_preserves_data_and_backup(photo_env, monkeypatch):
+    """A real v1 shape remains readable and unchanged until explicit migration."""
+    import json
+    from app.photo_data import maintenance
+
+    for name in ("a.arw", "a.jpg"):
+        (photo_env/name).write_bytes(b"raw")
+    monkeypatch.setattr(service, "extract_batch", fake_exif)
+    sid=service.add_source({"name":"old-source","root_path":str(photo_env)})["id"]
+    assert complete(service.launch_scan([sid]))["status"]=="completed"
+    preset_filter={"version":"photo-filter.v1","group":{"op":"and","children":[]}}
+    preset=service.save_preset("Old preset",preset_filter,["camera.model_norm"])
+    with db.connect() as conn:
+        conn.execute("CREATE TABLE scan_seen (run_id TEXT,source_id TEXT,relpath TEXT,payload TEXT,"
+                     "PRIMARY KEY(run_id,source_id,relpath))")
+        conn.execute("ALTER TABLE photos DROP COLUMN missing_scans")
+        conn.execute("UPDATE photos SET tags_json=?",
+                     (json.dumps({"ISO":1600,"Model":"ILCE-7M4","MeteringMode":5,
+                                  "GPSLongitude":123}),))
+        conn.execute("PRAGMA user_version=0")
+    before=service.summary()
+    previous=maintenance.status()
+    assert previous["migration_required"] is True
+    assert previous["schema_version"]==0
+    assert maintenance.start.__name__ == "start"
+    with pytest.raises(ValueError,match="确认"):
+        maintenance.start("migrate",False)
+    assert service.summary()==before
+
+    from app.photo_data.db import initialize
+    initialize()  # startup must not silently upgrade a pre-existing v1 DB
+    assert maintenance.status()["schema_version"]==0
+
+    result=maintenance._migrate()
+    assert "backup_file" in result
+    backup=db.database_path().with_name(result["backup_file"])
+    assert backup.exists()
+    with db.connect() as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0]==2
+        assert conn.execute("PRAGMA table_info(photos)").fetchall()
+        assert not conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='scan_seen'"
+        ).fetchone()
+        item=conn.execute("SELECT tags_json,missing_scans FROM photos LIMIT 1").fetchone()
+        exif=json.loads(item["tags_json"])
+        assert "ISO" not in exif and "Model" not in exif
+        assert exif["MeteringMode"]==5
+        assert exif["GPSLongitude"]==123  # Existing data is not rewritten beyond known EXIF
+        assert item["missing_scans"]==0
+    with __import__("sqlite3").connect(str(backup)) as old:
+        assert old.execute("PRAGMA user_version").fetchone()[0]==0
+        assert old.execute("SELECT COUNT(*) FROM photos").fetchone()[0]==2
+        assert old.execute("SELECT COUNT(*) FROM scan_seen").fetchone()[0]==0
+    assert service.summary()==before
+    assert any(p["name"]=="Old preset" for p in service.presets())
+    assert preset["name"]=="Old preset"
+
+    # Subsequent deep scan uses the separate stage DB, without touching the backup.
+    assert complete(service.launch_scan([sid],deep=True))["status"]=="completed"
+    assert service.summary()==before
+    assert not list(db.database_path().parent.glob(
+        db.database_path().stem+".scan-stage-*.sqlite"
+    ))
+
+
+def test_v2_missing_photo_purge_requires_three_confirmed_scans_and_age(photo_env, monkeypatch):
+    from datetime import datetime,timedelta,timezone
+    from app.photo_data import maintenance
+    monkeypatch.setattr(service,"extract_batch",fake_exif)
+    (photo_env/"a.arw").write_bytes(b"photo")
+    sid=service.add_source({"name":"source","root_path":str(photo_env)})["id"]
+    assert complete(service.launch_scan([sid]))["status"]=="completed"
+    (photo_env/"a.arw").unlink()
+    for expected in (1,2):
+        assert complete(service.launch_scan([sid]))["status"]=="completed"
+        with db.connect() as conn:
+            value=conn.execute("SELECT present,missing_scans FROM photos").fetchone()
+            assert tuple(value)==(0,expected)
+        assert maintenance._cleanup()["removed_photos"]==0
+    assert complete(service.launch_scan([sid]))["status"]=="completed"
+    with db.connect() as conn:
+        conn.execute("UPDATE photos SET updated_at=?",
+          ((datetime.now(timezone.utc)-timedelta(days=32)).isoformat(),))
+    assert maintenance.status()["eligible_for_purge"]==1
+    assert maintenance._cleanup()["removed_photos"]==1
+    assert service.query()["total_files"]==0
+
+
+def test_maintenance_operations_refuse_active_scan(photo_env, monkeypatch):
+    from app.photo_data import maintenance
+    import threading
+    (photo_env/"a.arw").write_bytes(b"photo")
+    started, release=threading.Event(),threading.Event()
+    def blocked(paths):
+        started.set()
+        assert release.wait(5)
+        return fake_exif(paths)
+    monkeypatch.setattr(service,"extract_batch",blocked)
+    sid=service.add_source({"name":"source","root_path":str(photo_env)})["id"]
+    run=service.launch_scan([sid])
+    try:
+        assert started.wait(5)
+        with pytest.raises(ValueError,match="扫描"):
+            maintenance.start("vacuum",True)
+        with pytest.raises(ValueError,match="扫描"):
+            maintenance.start("cleanup",True)
+    finally:
+        release.set()
+    assert complete(run)["status"]=="completed"
