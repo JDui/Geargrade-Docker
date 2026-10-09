@@ -71,6 +71,22 @@ def delete_source(source_id: str):
     return {"ok": True}
 
 
+class MaintenanceInput(BaseModel):
+    confirm: bool = False
+
+
+@router.get("/maintenance/status")
+def maintenance_status():
+    from app.photo_data.maintenance import status as maintenance_stats
+    return call(maintenance_stats)
+
+
+@router.post("/maintenance/{operation}", status_code=202)
+def maintenance_action(operation: str, payload: MaintenanceInput):
+    from app.photo_data.maintenance import start as maintenance_start
+    return call(maintenance_start, operation, payload.confirm)
+
+
 @router.get("/status")
 def status():
     return photos.status()
