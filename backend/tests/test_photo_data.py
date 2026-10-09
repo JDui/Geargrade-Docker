@@ -383,3 +383,29 @@ def test_cancelled_scan_keeps_last_published_snapshot(photo_env, monkeypatch):
     assert service.summary() == before
     with db.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM scan_seen").fetchone()[0] == 0
+
+
+def test_metadata_explorer_path_search_uses_index_and_escapes_like(photo_env, monkeypatch):
+    folder = photo_env / "Vacation"
+    folder.mkdir()
+    (folder / "DSC001.arw").write_bytes(b"raw")
+    (photo_env / "other.jpg").write_bytes(b"jpg")
+    monkeypatch.setattr(service, "extract_batch", fake_exif)
+    sid = service.add_source({"name": "Library", "root_path": str(photo_env)})["id"]
+    assert complete(service.launch_scan([sid]))["status"] == "completed"
+
+    def search(term):
+        return {"version": "photo-filter.v1", "group": {
+            "field": "files.relpath", "op": "contains", "value": term,
+        }}
+    assert service.query(search("Vacation"))["total_files"] == 1
+    assert service.query(search("DSC001"))["total_files"] == 1
+    assert service.query(search("other"))["total_files"] == 1
+    assert service.query(search("%"))["total_files"] == 0
+    assert service.query(search("_"))["total_files"] == 0
+    assert service.query(search("x' OR 1=1--"))["total_files"] == 0
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("file search must not access original photos")
+    monkeypatch.setattr(os, "scandir", forbidden)
+    assert service.query(search("Vacation"))["total_files"] == 1
