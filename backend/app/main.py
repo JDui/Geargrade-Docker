@@ -6,7 +6,8 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import bootstrap, dashboard, data, devices, leaderboards, media, settings as settings_routes, wishlist
+from app.api.routes import bootstrap, dashboard, data, devices, leaderboards, media, photo_data, settings as settings_routes, wishlist
+from app.photo_data.db import initialize as init_photo_data
 from app.core.config import get_settings
 from app.db.init_db import init_db, seed_if_needed
 from app.db.session import SessionLocal
@@ -16,6 +17,7 @@ from app.db.session import SessionLocal
 async def lifespan(_: FastAPI):
     settings = get_settings()
     init_db()
+    init_photo_data()
     with SessionLocal() as session:
         seed_if_needed(session, enabled=settings.seed_sample_data)
     yield
@@ -47,6 +49,7 @@ app.include_router(leaderboards.router, prefix=settings.api_v1_prefix)
 app.include_router(data.router, prefix=settings.api_v1_prefix)
 app.include_router(settings_routes.router, prefix=settings.api_v1_prefix)
 app.include_router(wishlist.router, prefix=settings.api_v1_prefix)
+app.include_router(photo_data.router, prefix=settings.api_v1_prefix)
 
 
 @app.get(f"{settings.api_v1_prefix}/health")
