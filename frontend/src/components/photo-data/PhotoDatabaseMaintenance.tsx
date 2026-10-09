@@ -10,8 +10,9 @@ const bytes = (value:number) => {
 };
 const formatted=(x:number)=>x.toLocaleString("zh-CN");
 
-export function PhotoDatabaseMaintenance({onUpdated}:{
-  onUpdated:()=>void;
+export function PhotoDatabaseMaintenance({onUpdated,mode="manage"}:{
+  onUpdated?:()=>void;
+  mode?:"manage"|"migration-prompt";
 }) {
   const [stats,setStats]=useState<PhotoMaintenanceStatus|null>(null);
   const [error,setError]=useState("");
@@ -35,7 +36,7 @@ export function PhotoDatabaseMaintenance({onUpdated}:{
         setStats(result);
         if(result.job?.status==="completed" && result.job.id!==lastCompleted.current) {
           lastCompleted.current=result.job.id;
-          onUpdated();
+          onUpdated?.();
         }
       }).catch(e=>{if(open)setError(String(e));});
     },1200);
@@ -63,7 +64,7 @@ export function PhotoDatabaseMaintenance({onUpdated}:{
   const job:PhotoMaintenanceJob|null=stats?.job||null;
   const showPrompt=!!stats?.migration_required&&!deferred&&!activeJob;
   return <>
-    <section className="panel p-4 space-y-3" aria-label="照片索引数据库维护">
+    {mode==="manage"?<section className="panel p-4 space-y-3" aria-label="照片索引数据库维护">
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
           <div className="dashboard-kicker">Index Storage · SQLite</div>
@@ -128,9 +129,9 @@ export function PhotoDatabaseMaintenance({onUpdated}:{
           </>}
         </div>
       </div>:null}
-    </section>
-    {showPrompt?<div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/65" aria-hidden="true"/>
+    </section>:null}
+    {showPrompt?<div className="photo-modal-layer fixed inset-0 z-[95] flex items-center justify-center p-4">
+      <div className="photo-modal-backdrop absolute inset-0" aria-hidden="true"/>
       <div role="dialog" aria-modal="true" aria-labelledby="photo-migration-heading"
         className="relative panel p-5 sm:p-6 w-full max-w-xl space-y-4 shadow-2xl">
         <div className="dashboard-kicker">Database Upgrade Required</div>

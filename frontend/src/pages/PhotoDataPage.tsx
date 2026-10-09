@@ -443,7 +443,7 @@ export default function PhotoDataPage() {
       {message?<p role="alert" className="mt-3 text-sm font-medium text-textPrimary">{message}</p>:null}
     </section>
 
-    <PhotoDatabaseMaintenance onUpdated={()=>setRefresh(value=>value+1)}/>
+    <PhotoDatabaseMaintenance mode="migration-prompt" onUpdated={()=>setRefresh(value=>value+1)}/>
 
     <section className="panel p-3 sm:p-4 space-y-3 photo-workspace-toolbar">
       <div className="flex flex-wrap items-center justify-between gap-3">
