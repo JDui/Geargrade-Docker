@@ -10,7 +10,7 @@ export function PhotoMetadataExplorer({results,loading,page,pageSize,onPageChang
   search:string;onSearchChange:(text:string)=>void;onExport:()=>void;
 }) {
   const [selected,setSelected]=useState<PhotoItem|null>(null);
-  const originRef=useRef<HTMLButtonElement>(null);
+  const originRef=useRef<HTMLButtonElement|null>(null);
   const detailRef=useRef<HTMLElement>(null);
   const shouldRestore=useRef(false);
   useEffect(()=>{
