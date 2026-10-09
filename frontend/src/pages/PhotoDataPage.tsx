@@ -479,6 +479,7 @@ export default function PhotoDataPage() {
           onClick={()=>{setMode("advanced");setFiltersOpen(true);}}>高级规则 · {advancedCount} 条</button>:null}
         {!filterCount?<span>全部照片（未启用筛选）</span>:null}
         <span className="ml-auto tabular-nums">匹配 {formatCount(summary?.logical_captures)} 次拍摄 · {formatCount(summary?.physical_files)} 个文件</span>
+        <a href="/data-tools" className="text-accent hover:underline whitespace-nowrap">数据库维护 → 数据工具</a>
         {filterCount?<button type="button" className="text-accent hover:underline"
           onClick={()=>{setColumns(initialColumns);setAdvanced(emptyGroup());setPage(0);}}>清除条件</button>:null}
       </div>
