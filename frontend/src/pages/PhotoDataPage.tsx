@@ -440,7 +440,7 @@ export default function PhotoDataPage() {
         尚未添加扫描目录。请先到 <a href="/settings" className="text-accent underline">设置 / 拍摄数据源</a>
         添加 Docker 内的只读目录；保存目录不会开始扫描。
       </p>:null}
-      {message?<p role="alert" className="mt-3 text-sm text-textSecondary">{message}</p>:null}
+      {message?<p role="alert" className="mt-3 text-sm font-medium text-textPrimary">{message}</p>:null}
     </section>
 
     <PhotoDatabaseMaintenance onUpdated={()=>setRefresh(value=>value+1)}/>

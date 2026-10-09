@@ -1455,3 +1455,46 @@ body {
     radial-gradient(circle at top, rgba(179, 92, 34, 0.08), transparent 58%),
     linear-gradient(180deg, rgba(255, 245, 239, 0.98), rgba(255, 255, 255, 0.98));
 }
+
+
+/* Accessible chart and interactive state contrast for both themes. */
+:root { --photo-chart-strong-ink: #081420; --photo-chart-axis: 184 198 218; --photo-chart-grid: 72 90 114; }
+:root[data-theme="light"] {
+  --photo-chart-strong-ink: #ffffff;
+  --photo-chart-axis: 71 85 105;
+  --photo-chart-grid: 202 213 226;
+}
+.photo-data-page .recharts-cartesian-axis-tick text,
+.photo-data-page .recharts-cartesian-axis-tick-value,
+.photo-data-page .recharts-text,
+.photo-data-page .recharts-label { fill: rgb(var(--photo-chart-axis)); }
+.photo-data-page .recharts-cartesian-axis-line,
+.photo-data-page .recharts-cartesian-axis-tick-line,
+.photo-data-page .recharts-cartesian-grid line { stroke: rgb(var(--photo-chart-grid) / 0.7); }
+.photo-data-page .recharts-legend-item-text { color: rgb(var(--color-text-primary)) !important; }
+.photo-data-page .recharts-default-tooltip {
+  background: var(--tooltip-bg) !important;
+  color: rgb(var(--color-text-primary)) !important;
+  border: 1px solid var(--tooltip-border) !important;
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.18);
+}
+.photo-data-page .recharts-tooltip-label,
+.photo-data-page .recharts-tooltip-item,
+.photo-data-page .recharts-tooltip-item-name,
+.photo-data-page .recharts-tooltip-item-value { color: rgb(var(--color-text-primary)) !important; }
+.photo-data-page button:disabled { opacity: 0.78; }
+.photo-data-page select,
+.photo-data-page input,
+.photo-data-page textarea { color-scheme: inherit; }
+.photo-data-page select option,
+.photo-data-page select optgroup {
+  color: rgb(var(--color-text-primary));
+  background-color: rgb(var(--color-panel));
+}
+.photo-data-page .input:focus-visible,
+.photo-data-page button:focus-visible {
+  outline: 2px solid rgb(var(--color-accent));
+  outline-offset: 2px;
+}
+.photo-data-page [role="dialog"] { color: rgb(var(--color-text-primary)); }

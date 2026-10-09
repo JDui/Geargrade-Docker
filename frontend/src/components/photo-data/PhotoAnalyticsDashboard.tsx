@@ -158,7 +158,7 @@ function Heat({title,desc,xs,ys,data,onChoose}:{
             return <button key={i} type="button" disabled={!n||!onChoose}
               aria-label={label+" × "+x+"："+n+"次"} title={label+" × "+x+"："+count(n)+"次"}
               className="w-9 h-8 rounded text-[10px] text-textPrimary enabled:hover:ring-1 enabled:hover:ring-accent"
-              style={{backgroundColor:"rgba(92,200,255,"+opacity+")"}} onClick={()=>onChoose?.(i,y)}>
+              style={{backgroundColor:"rgb(var(--color-accent) / "+opacity+")",color:opacity>=.55?"var(--photo-chart-strong-ink)":"rgb(var(--color-text-primary))"}} onClick={()=>onChoose?.(i,y)}>
               {n?count(n):"·"}
             </button>;
           })}
@@ -195,7 +195,7 @@ function Calendar({daily,choose}:{
             return <button key={date} className="w-3.5 h-3.5 rounded-[3px] hover:ring-1 hover:ring-accent"
               type="button" title={date+": "+count(v)+"次"} aria-label={date+"拍摄"+v+"次"}
               onClick={()=>choose("capture.date",date)}
-              style={{backgroundColor:"rgba(92,200,255,"+(v?.15+Math.sqrt(v/max)*.82:.05)+")"}}/>;
+              style={{backgroundColor:"rgb(var(--color-accent) / "+(v?.15+Math.sqrt(v/max)*.82:.05)+")"}}/>;
           })}
         </div>
       </div>
