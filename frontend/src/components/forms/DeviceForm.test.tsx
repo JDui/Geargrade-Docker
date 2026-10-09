@@ -25,9 +25,11 @@ describe("DeviceForm", () => {
     fireEvent.change(screen.getByLabelText("状态"), { target: { value: "for_sale" } });
     fireEvent.click(screen.getByRole("button", { name: "创建设备" }));
 
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ score: -1, sale_price: null, sale_date: null })
-    );
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ score: -1, sale_price: null, sale_date: null })
+      );
+    });
   });
 
   it("accepts pasted image files in upload mode", () => {

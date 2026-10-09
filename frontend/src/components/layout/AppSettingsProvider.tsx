@@ -196,7 +196,8 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
       settingsWriteQueue.current = settingsWriteQueue.current
         .catch(() => undefined)
         .then(() => updateAppSettings(toApiSettings(settings)))
-        .then(() => undefined);
+        .then(() => undefined)
+        .catch(() => undefined);
     }
   }, [settings, settingsReady]);
 

@@ -271,7 +271,12 @@ def scan_worker(run_id: str, source_ids: list[str], deep: bool, confirm_large: b
                     "AND x.source_id=p.source_id AND x.relpath=p.relpath)",
                     (source_id, run_id),
                 ).fetchone()[0]
-                if missing > max(100, int(len(existing) * 0.5)) and not confirm_large:
+                previous_active = db.execute(
+                    "SELECT COUNT(*) FROM photos WHERE source_id=? AND present=1", (source_id,)
+                ).fetchone()[0]
+                if missing and not confirm_large and (
+                    missing == previous_active or missing > max(100, int(previous_active * 0.5))
+                ):
                     raise RuntimeError(
                         f"本次发现 {missing} 个文件缺失。为防止 NAS 误挂载清空索引，"
                         "请确认后勾选允许大量移除并再次手动扫描。"
