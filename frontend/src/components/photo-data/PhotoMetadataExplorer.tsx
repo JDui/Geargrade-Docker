@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { PhotoItem, PhotoQuery } from "../../api/photoData";
 
 const format = (n:number) => n.toLocaleString("zh-CN");
@@ -116,24 +117,26 @@ export function PhotoMetadataExplorer({results,loading,page,pageSize,onPageChang
       <button className="button-secondary" disabled={loading||end>=total} type="button"
         onClick={()=>onPageChange(page+1)}>下一页</button>
     </nav>
-    {selected?<div className="fixed inset-0 z-[90]">
-      <button className="absolute inset-0 bg-black/60 w-full h-full cursor-default" type="button"
+    {selected?createPortal(<div className="photo-modal-layer fixed inset-0 z-[110] flex items-center justify-center p-2 sm:p-5">
+      <button className="photo-modal-backdrop absolute inset-0 w-full h-full cursor-default" type="button"
         aria-label="关闭照片详情" onClick={()=>setSelected(null)}/>
       <aside ref={detailRef} role="dialog" aria-modal="true" aria-label={"文件元数据："+selected.filename}
-        className="absolute right-0 inset-y-0 w-full sm:w-[min(90vw,520px)] overflow-y-auto bg-panel border-l border-line shadow-2xl">
-        <header className="sticky top-0 z-10 flex gap-3 justify-between items-start p-5 bg-panel border-b border-line">
+        className="photo-detail-modal relative z-10 flex w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
+        <header className="shrink-0 flex gap-3 justify-between items-start p-5 sm:px-6 bg-panel border-b border-line">
           <div className="min-w-0"><div className="dashboard-kicker">Metadata Record</div>
             <h3 className="font-semibold mt-1 text-lg text-textPrimary break-all">{selected.filename}</h3></div>
           <button className="button-secondary shrink-0" type="button" onClick={()=>setSelected(null)}>关闭</button>
         </header>
-        <dl className="p-5 space-y-3">
+        <div className="photo-modal-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-7 gap-y-1">
           {properties(selected).map(([label,value])=><div key={label} className="border-b border-line/50 pb-3">
             <dt className="text-xs text-textSecondary">{label}</dt>
             <dd className="text-sm mt-1 text-textPrimary break-all select-text">{value}</dd>
           </div>)}
         </dl>
-        <p className="text-xs text-textSecondary px-5 pb-5">仅显示索引已经保存的字段，不读取或修改原始照片。</p>
+        <p className="text-xs text-textSecondary py-4">仅显示索引已经保存的字段，不读取或修改原始照片。可滚动查看全部字段。</p>
+        </div>
       </aside>
-    </div>:null}
+    </div>,document.body):null}
   </section>;
 }
