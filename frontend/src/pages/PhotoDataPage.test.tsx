@@ -152,4 +152,20 @@ describe("PhotoDataPage regressions", () => {
     expect(vi.mocked(api.getPhotoSummary).mock.calls.length).toBe(summaries);
   });
 
+  it("renders global filters as a centered body portal and restores scroll on Escape",async()=>{
+    mount();
+    await ready();
+    const dialog=screen.getByRole("dialog",{name:"照片全局筛选"});
+    const portal=dialog.closest(".photo-modal-layer");
+    expect(portal?.parentElement).toBe(document.body);
+    expect(dialog).toHaveClass("photo-filter-modal");
+    expect(dialog.querySelector(".photo-modal-scroll")).toBeInTheDocument();
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(dialog.querySelectorAll('select[aria-label="列字段"]').length).toBeGreaterThanOrEqual(3);
+    fireEvent.keyDown(document,{key:"Escape"});
+    expect(screen.queryByRole("dialog",{name:"照片全局筛选"})).not.toBeInTheDocument();
+    expect(document.body.style.overflow).toBe("");
+    expect(screen.getByRole("button",{name:/全局筛选/})).toHaveFocus();
+  });
+
 });

@@ -38,6 +38,9 @@ describe("PhotoMetadataExplorer",()=>{
     const button=screen.getByRole("button",{name:"查看元数据：DSC001.ARW"});
     fireEvent.click(button);
     const dialog=screen.getByRole("dialog",{name:"文件元数据：DSC001.ARW"});
+    expect(dialog.closest(".photo-modal-layer")?.parentElement).toBe(document.body);
+    expect(dialog).toHaveClass("photo-detail-modal");
+    expect(dialog.querySelector(".photo-modal-scroll")).toBeInTheDocument();
     expect(dialog).toHaveTextContent("2026/Trip/DSC001.ARW");
     expect(dialog).toHaveTextContent("7008 × 4672 px");
     expect(document.body).toHaveStyle({overflow:"hidden"});
