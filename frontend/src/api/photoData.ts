@@ -2,7 +2,7 @@ import { apiDelete, apiGet, apiPost } from "./client";
 
 export type PhotoField = { field_id: string; label: string; value_type: "enum" | "number" | "date"; operators: string[] };
 export type PhotoRule = { field: string; op: string; value?: string | number | Array<string | number>; column_id?: string }
-  | { op: "and" | "or" | "not"; children: PhotoRule[] };
+  | { op: "and" | "or" | "not"; children: PhotoRule[]; column_id?: string };
 export type PhotoFilter = { version: "photo-filter.v1"; group: PhotoRule };
 export type PhotoSource = { id: string; name: string; root_path: string; enabled: number; last_success: string | null };
 export type PhotoScan = { id: string; started_at: string; ended_at: string | null; status: string; mode: string;

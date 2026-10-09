@@ -7,6 +7,7 @@ import {
   fetchScoreLeaderboard
 } from "../api/leaderboards";
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
+import PhotoUsageLeaderboard from "../components/photo-data/PhotoUsageLeaderboard";
 import { useAppSettings } from "../components/layout/AppSettingsProvider";
 import {
   CATEGORY_LABELS,
@@ -30,7 +31,7 @@ type RankedEntry = {
   meta: string;
 };
 
-const VALID_TABS: LeaderboardTab[] = ["holding-duration", "score", "finance"];
+const VALID_TABS: LeaderboardTab[] = ["holding-duration", "score", "finance", "photo-usage"];
 const VALID_SORTS: SortOrder[] = ["desc", "asc"];
 const VALID_CATEGORIES = Object.keys(CATEGORY_LABELS) as DeviceCategory[];
 
@@ -38,7 +39,8 @@ function tabLabel(tab: LeaderboardTab) {
   return {
     "holding-duration": "持有时间榜",
     score: "评分榜",
-    finance: "理财榜"
+    finance: "理财榜",
+    "photo-usage": "拍摄使用量榜"
   }[tab];
 }
 
@@ -47,6 +49,7 @@ function normalizeEntries(
   items: HoldingDurationItem[] | ScoreLeaderboardItem[] | FinanceLeaderboardItem[],
   durationUnit: DurationUnit
 ): RankedEntry[] {
+  if (tab === "photo-usage") return [];
   if (tab === "holding-duration") {
     const datePrecision: "day" | "month" = durationUnit === "months" ? "month" : "day";
     return (items as HoldingDurationItem[]).map((item) => ({
@@ -209,6 +212,7 @@ export default function LeaderboardsPage() {
   useEffect(() => {
     setError(null);
 
+    if (tab === "photo-usage") return;
     const loader =
       tab === "holding-duration"
         ? fetchHoldingDurationLeaderboard(sortOrder, durationUnit, category).then((result) => setHoldingItems(result.items))
@@ -252,6 +256,8 @@ export default function LeaderboardsPage() {
     }
     setSearchParams(params);
   }
+
+  if (tab === "photo-usage") return <PhotoUsageLeaderboard />;
 
   return (
     <div className="space-y-6">

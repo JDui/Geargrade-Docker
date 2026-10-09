@@ -39,7 +39,7 @@ export type DurationUnit = "days" | "months";
 export type WishlistSortBy = "name" | "brand" | "category" | "score" | "updated_at" | "created_at";
 export type ViewMode = "cards" | "table";
 export type ThemeMode = "dark" | "light";
-export type LeaderboardTab = "holding-duration" | "score" | "finance";
+export type LeaderboardTab = "holding-duration" | "score" | "finance" | "photo-usage";
 export type AnnualBreakdownMode = "category" | "rating";
 
 export interface BaseCatalogItem {

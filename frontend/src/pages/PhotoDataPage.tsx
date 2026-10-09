@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   cancelPhotoScan, createPhotoPreset, deletePhotoPreset, emptyPhotoFilter, exportPhotoData,
@@ -87,8 +88,15 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
 }
 
 export default function PhotoDataPage() {
+  const [queryParams] = useSearchParams();
   const [fields,setFields]=useState<PhotoField[]>([]);
-  const [columns,setColumns]=useState<Column[]>(initialColumns);
+  const [columns,setColumns]=useState<Column[]>(()=>{
+    const camera=queryParams.get("camera");
+    const lens=queryParams.get("lens");
+    return initialColumns.map(c=>({...c,selected:
+      c.field==="camera.model_norm"&&camera?[camera]:
+      c.field==="lens.model_norm"&&lens?[lens]:[]}));
+  });
   const [advanced,setAdvanced]=useState<PhotoRule>(emptyGroup());
   const [mode,setMode]=useState<"columns"|"advanced">("columns");
   const [status,setStatus]=useState<PhotoStatus|null>(null);
