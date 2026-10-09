@@ -369,7 +369,10 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
       </>}
       {tab==="exposure"&&<>
         <Buckets title="ISO 感光度分布" desc="按区间聚合的感光度直方图" items={d.exposure.iso} onChoose={bin}/>
-        <Buckets title="焦距分布" desc="镜头真实焦距，未假设等效焦距" items={d.exposure.focal} onChoose={bin}/>
+        <Donut title="等效焦距识别来源" desc="EXIF 原生等效焦距、机身画幅推算或未知；未知不会按 1× 处理"
+          items={d.exposure.focal_coverage.map(v=>({...v,name:
+            v.name==="EXIF"?"EXIF 等效焦距":v.name==="camera_profile"?"机身画幅换算":"画幅未知 / 无等效数据"}))}/>
+        <Buckets title="35mm 等效焦距分布" desc="优先使用 EXIF 等效焦距；缺失时只按已识别机身画幅换算，未知画幅不混入分布" items={d.exposure.focal} onChoose={bin}/>
         <Buckets title="光圈分布" desc="F 值区间频率" items={d.exposure.aperture} onChoose={bin}/>
         <Buckets title="快门速度分布" desc="短曝光至长曝光，按照秒数区间" items={d.exposure.shutter} onChoose={bin}/>
         <Buckets title="曝光补偿分布" desc="正负 EV 值，未知不计入 0" items={d.exposure.ev} onChoose={bin}/>
@@ -382,11 +385,11 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
             ...rangeRules("exposure.iso",isoRanges[x][0],isoRanges[x][1]),
             ...rangeRules("exposure.shutter",shutterRanges[y][0],shutterRanges[y][1])
           ])}/>
-        <Heat title="焦距 × 光圈热力图" desc="揭示不同焦段偏好的实际光圈"
+        <Heat title="35mm 等效焦距 × 光圈热力图" desc="等效焦距区间配合实际拍摄光圈；不能确认画幅的数据不参与"
           xs={["<24mm","24–49","50–99","100–199","≥200"]}
           ys={["<F2","F2–3.9","F4–7.9","F8–15.9","≥F16"]}
           data={d.exposure.focal_aperture} onChoose={(x,y)=>onApplyRules([
-            ...rangeRules("exposure.focal_mm",focalRanges[x][0],focalRanges[x][1]),
+            ...rangeRules("exposure.focal_eq_mm",focalRanges[x][0],focalRanges[x][1]),
             ...rangeRules("exposure.aperture",apRanges[y][0],apRanges[y][1])
           ])}/>
         <Ranking title="白平衡设置" desc="相机白平衡 EXIF 值" items={d.exposure.wb}

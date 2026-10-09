@@ -56,7 +56,7 @@ export type PhotoAnalytics = {
     lens_by_camera: { camera: string; lens: string; count: number }[];
   };
   exposure: {
-    iso: AnalyticsBucket[]; focal: AnalyticsBucket[]; aperture: AnalyticsBucket[];
+    iso: AnalyticsBucket[]; focal: AnalyticsBucket[]; focal_coverage: AnalyticsCount[]; aperture: AnalyticsBucket[];
     shutter: AnalyticsBucket[]; ev: AnalyticsBucket[];
     flash: AnalyticsCount[]; wb: AnalyticsCount[]; focus: AnalyticsCount[];
     drive: AnalyticsCount[]; shutter_type: AnalyticsCount[]; picture_style: AnalyticsCount[];
