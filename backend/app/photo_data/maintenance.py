@@ -149,7 +149,11 @@ def _migrate() -> dict:
             if "missing_scans" not in columns:
                 db.execute("ALTER TABLE photos ADD COLUMN missing_scans INTEGER NOT NULL DEFAULT 0")
             db.execute("UPDATE photos SET missing_scans=1 WHERE present=0 AND missing_scans=0")
-            paths = ["$." + x for x in sorted(EXIF_STRUCTURED_TAGS)]
+            # Legacy payloads should never leak accidentally persisted GPS.
+            paths = ["$." + x for x in sorted(EXIF_STRUCTURED_TAGS | {
+                "GPSLatitude", "GPSLongitude", "GPSAltitude", "GPSPosition",
+                "GPSLatitudeRef", "GPSLongitudeRef", "GPSDateStamp", "GPSTimeStamp",
+            })]
             placeholders = ",".join("?" for _ in paths)
             db.execute(
                 "UPDATE photos SET tags_json=CASE WHEN json_valid(tags_json) "

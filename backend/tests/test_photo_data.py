@@ -464,7 +464,7 @@ def test_v1_database_opt_in_migration_preserves_data_and_backup(photo_env, monke
         exif=json.loads(item["tags_json"])
         assert "ISO" not in exif and "Model" not in exif
         assert exif["MeteringMode"]==5
-        assert exif["GPSLongitude"]==123  # Existing data is not rewritten beyond known EXIF
+        assert "GPSLongitude" not in exif  # Old stray location tags are sanitized
         assert item["missing_scans"]==0
     with __import__("sqlite3").connect(str(backup)) as old:
         assert old.execute("PRAGMA user_version").fetchone()[0]==0
