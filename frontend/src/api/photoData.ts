@@ -6,7 +6,10 @@ export type PhotoRule = { field: string; op: string; value?: string | number | A
 export type PhotoFilter = { version: "photo-filter.v1"; group: PhotoRule };
 export type PhotoSource = { id: string; name: string; root_path: string; enabled: number; last_success: string | null };
 export type PhotoScan = { id: string; started_at: string; ended_at: string | null; status: string; mode: string;
-  seen: number; extracted: number; unchanged: number; failed: number; removed: number; error: string | null };
+  seen: number; extracted: number; unchanged: number; failed: number; removed: number; error: string | null;
+  processed: number; total_candidates: number; directories_seen: number; phase: string;
+  workers: number; active_workers: number; enumeration_done: number;
+  rate_files_per_sec: number };
 export type PhotoStatus = { sources: PhotoSource[]; recent_scans: PhotoScan[]; last_success: string | null };
 export type PhotoSummary = { physical_files: number; logical_captures: number; raw_files: number | null; total_bytes: number;
   first_shot: string | null; last_shot: string | null; months: Array<{month:string;count:number}>; as_of:string | null };

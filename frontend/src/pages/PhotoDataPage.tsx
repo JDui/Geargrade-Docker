@@ -87,6 +87,11 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
   </div>;
 }
 
+function enummerationDoneGuard(run:PhotoScan|null):number|null {
+  if(!run?.enumeration_done||!run.rate_files_per_sec||run.rate_files_per_sec<=0) return null;
+  return Math.max(0,Math.round((run.seen-run.processed)/run.rate_files_per_sec));
+}
+
 export default function PhotoDataPage() {
   const [queryParams] = useSearchParams();
   const [fields,setFields]=useState<PhotoField[]>([]);
@@ -138,6 +143,11 @@ export default function PhotoDataPage() {
       .catch(e=>{if(mounted)setMessage(showError(e));});
     return ()=>{mounted=false;};
   },[refresh]);
+
+  useEffect(()=>{
+    const active=status?.recent_scans.find(x=>["queued","running"].includes(x.status));
+    if(active && !runId)setRunId(active.id);
+  },[status,runId]);
 
   useEffect(()=>{
     if(!runId)return;
@@ -210,6 +220,18 @@ export default function PhotoDataPage() {
   const sourceReady=!!status?.sources.length;
   const isRunning=!!runId||!!status?.recent_scans.some(x=>["queued","running"].includes(x.status));
   const latestRun=run??status?.recent_scans[0]??null;
+  const enumerationDone=!!latestRun?.enumeration_done;
+  const doneCount=latestRun?.processed??0;
+  const foundCount=latestRun?.seen??0;
+  const progressPercent=latestRun?.status==="completed"?100:
+    enumerationDone&&foundCount>0?Math.min(99,Math.round(doneCount/foundCount*100)):null;
+  const remaining=enummerationDoneGuard(latestRun);
+  const phaseName:Record<string,string>={
+    queued:"排队中",preflight:"检查挂载",enumerating:"发现文件并解析元数据",
+    extracting:"等待剩余解析任务",publishing:"发布完整索引",
+    completed_source:"来源完成",completed:"已完成",
+    interrupted:"意外中断",failed:"失败",cancelled:"已取消"
+  };
 
   return <div className="space-y-6">
     <section className="panel p-6">
@@ -237,10 +259,39 @@ export default function PhotoDataPage() {
           onChange={e=>setConfirmRemovals(e.target.checked)} />
         已确认当前 NAS 挂载完整，允许本次扫描发布大规模文件移除
       </label>
-      {latestRun?<div className="mt-4 rounded-xl bg-panelAlt/70 p-3 text-sm text-textSecondary">
-        最近尝试：{latestRun.status} · 已发现 {formatCount(latestRun.seen)} 个文件 ·
-        新提取 {formatCount(latestRun.extracted)} · 未变化 {formatCount(latestRun.unchanged)}
-        {latestRun.error?<div className="mt-2 text-danger">{latestRun.error}</div>:null}
+      {latestRun?<div className="mt-4 rounded-xl bg-panelAlt/70 p-4 space-y-3 text-sm text-textSecondary" aria-live="polite">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <strong className="text-textPrimary">扫描状态：{phaseName[latestRun.phase]||phaseName[latestRun.status]||latestRun.status}</strong>
+          <span>{progressPercent===null?"正在发现文件，尚无法确定总量":progressPercent+"%"} </span>
+        </div>
+        <div role="progressbar" aria-label="扫描进度" aria-valuemin={0} aria-valuemax={100}
+          aria-valuenow={progressPercent??undefined} aria-valuetext={progressPercent===null?"正在枚举目录，进度未确定":progressPercent+"%" }
+          className="h-3 w-full overflow-hidden rounded-full bg-line">
+          <div className={"h-full rounded-full bg-accent transition-all duration-500 "+(progressPercent===null?"w-1/4 animate-pulse":"")}
+            style={progressPercent===null?undefined:{width:progressPercent+"%"}} />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            ["已发现照片",formatCount(foundCount)],
+            ["已处理照片",formatCount(doneCount)],
+            ["新增解析",formatCount(latestRun.extracted)],
+            ["未变化跳过",formatCount(latestRun.unchanged)],
+            ["解析失败",formatCount(latestRun.failed)],
+            ["检测目录",formatCount(latestRun.directories_seen)]
+          ].map(([title,value])=><div key={title} className="rounded-lg border border-line/70 p-2">
+            <div className="text-[11px] text-textSecondary">{title}</div>
+            <div className="mt-1 font-semibold text-textPrimary">{value}</div>
+          </div>)}
+        </div>
+        <div className="flex flex-wrap gap-4 text-xs">
+          <span>自适应并发：{latestRun.workers||0} 个工作线程</span>
+          <span>运行任务：{latestRun.active_workers||0}</span>
+          <span>吞吐：{(latestRun.rate_files_per_sec||0).toFixed(1)} 文件/秒</span>
+          <span>等待解析：{Math.max(0,foundCount-doneCount).toLocaleString("zh-CN")}</span>
+          {remaining!==null&&latestRun.status==="running"?
+            <span>估算剩余：约 {remaining<120?remaining+" 秒":Math.ceil(remaining/60)+" 分钟"}（仅文件枚举完成后估算）</span>:null}
+        </div>
+        {latestRun.error?<div className="text-danger">{latestRun.error}</div>:null}
       </div>:null}
       {!sourceReady?<p className="mt-4 text-sm text-textSecondary">
         尚未添加扫描目录。请先到 <a href="/settings" className="text-accent underline">设置 / 拍摄数据源</a>
