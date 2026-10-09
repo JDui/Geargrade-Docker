@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PhotoAnalyticsDashboard } from "../components/photo-data/PhotoAnalyticsDashboard";
+import { PhotoMetadataExplorer } from "../components/photo-data/PhotoMetadataExplorer";
 import {
   cancelPhotoScan, createPhotoPreset, deletePhotoPreset, emptyPhotoFilter, exportPhotoData,
   getPhotoFacet, getPhotoFields, getPhotoPresets, getPhotoQuery, getPhotoScan, getPhotoStatus,
@@ -22,6 +23,7 @@ const formatCount = (value:number|null|undefined) => (value??0).toLocaleString("
 const displayDate = (value:string|null|undefined) => value ? new Date(value).toLocaleString("zh-CN") : "尚无成功扫描";
 const showError = (e:unknown) => e instanceof Error ? e.message : String(e);
 const isGroup = (rule:PhotoRule):rule is Extract<PhotoRule,{children:PhotoRule[]}> => "children" in rule;
+const ruleCount=(rule:PhotoRule):number=>isGroup(rule)?rule.children.reduce((sum,child)=>sum+ruleCount(child),0):1;
 
 function RuleListInput({value,numeric,onChange}:{
   value:string|number|Array<string|number>|undefined;numeric:boolean;onChange:(values:Array<string|number>)=>void;
@@ -113,7 +115,15 @@ function enummerationDoneGuard(run:PhotoScan|null):number|null {
 }
 
 export default function PhotoDataPage() {
-  const [queryParams] = useSearchParams();
+  const [queryParams,setQueryParams] = useSearchParams();
+  const workspace=queryParams.get("view")==="files"?"files":"charts";
+  const [filtersOpen,setFiltersOpen]=useState(false);
+  const filterButtonRef=useRef<HTMLButtonElement>(null);
+  const filterDrawerRef=useRef<HTMLElement>(null);
+  const filterWasOpen=useRef(false);
+  const [fileSearch,setFileSearch]=useState("");
+  const [committedFileSearch,setCommittedFileSearch]=useState("");
+  const [pageSize,setPageSize]=useState(40);
   const [fields,setFields]=useState<PhotoField[]>([]);
   const [columns,setColumns]=useState<Column[]>(()=>{
     const camera=queryParams.get("camera");
@@ -159,6 +169,50 @@ export default function PhotoDataPage() {
   },[columns,advanced,fields]);
 
   const filterKey=JSON.stringify(filter);
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>setCommittedFileSearch(fileSearch.trim().slice(0,256)),240);
+    return ()=>window.clearTimeout(timer);
+  },[fileSearch]);
+  const fileFilter=useMemo<PhotoFilter>(()=>{
+    if(!committedFileSearch)return filter;
+    return {version:"photo-filter.v1",group:{op:"and",children:[
+      filter.group,{field:"files.relpath",op:"contains",value:committedFileSearch}
+    ]}};
+  },[filterKey,committedFileSearch]);
+  const fileFilterKey=JSON.stringify(fileFilter);
+  useEffect(()=>{
+    if(!filtersOpen){
+      if(filterWasOpen.current){
+        filterButtonRef.current?.focus();
+        filterWasOpen.current=false;
+      }
+      return;
+    }
+    filterWasOpen.current=true;
+    filterDrawerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const onKey=(event:KeyboardEvent)=>{
+      if(event.key==="Escape"){event.preventDefault();setFiltersOpen(false);return;}
+      if(event.key!=="Tab")return;
+      const elements=Array.from(filterDrawerRef.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), select:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')||[]);
+      if(!elements.length)return;
+      if(event.shiftKey&&document.activeElement===elements[0]){
+        event.preventDefault();elements[elements.length-1].focus();
+      }else if(!event.shiftKey&&document.activeElement===elements[elements.length-1]){
+        event.preventDefault();elements[0].focus();
+      }
+    };
+    document.addEventListener("keydown",onKey);
+    return ()=>document.removeEventListener("keydown",onKey);
+  },[filtersOpen]);
+  function changeWorkspace(next:"charts"|"files"){
+    setQueryParams(current=>{
+      const updated=new URLSearchParams(current);
+      if(next==="files")updated.set("view","files");
+      else updated.delete("view");
+      return updated;
+    },{replace:true});
+  }
   const columnsKey=JSON.stringify(columns.map(({id,field})=>({id,field})));
   useEffect(()=>{
     let mounted=true;
@@ -199,20 +253,30 @@ export default function PhotoDataPage() {
 
   useEffect(()=>{
     let active=true;
-    setLoading(true);
-    Promise.all([getPhotoSummary(filter),getPhotoQuery(filter,40,page*40)])
-      .then(([s,r])=>{if(active){setSummary(s);setResults(r);setLoading(false);}})
-      .catch(e=>{if(active){setMessage(showError(e));setLoading(false);}});
+    void getPhotoSummary(filter).then(value=>{if(active)setSummary(value);})
+      .catch(e=>{if(active)setMessage(showError(e));});
     return ()=>{active=false;};
-  },[filterKey,page,refresh]);
+  },[filterKey,refresh]);
 
   useEffect(()=>{
+    if(workspace!=="files")return;
+    let active=true;
+    setLoading(true);
+    setResults(null);
+    void getPhotoQuery(fileFilter,pageSize,page*pageSize)
+      .then(value=>{if(active){setResults(value);setLoading(false);}})
+      .catch(e=>{if(active){setMessage(showError(e));setLoading(false);}});
+    return ()=>{active=false;};
+  },[workspace,fileFilterKey,pageSize,page,refresh]);
+
+  useEffect(()=>{
+    if(!filtersOpen||mode!=="columns")return;
     let active=true;
     void Promise.all(columns.map(async col=>[col.id,await getPhotoFacet(filter,col.field)] as const))
       .then(pairs=>{if(active)setFacets(Object.fromEntries(pairs));})
       .catch(e=>{if(active)setMessage(showError(e));});
     return ()=>{active=false;};
-  },[filterKey,columnsKey,refresh]);
+  },[filtersOpen,mode,filterKey,columnsKey,refresh]);
 
   async function start() {
     if(startPending.current)return;
@@ -282,10 +346,16 @@ export default function PhotoDataPage() {
     });
     setMode("advanced");
     setPage(0);
-    setMessage("已应用图表筛选：相同字段的旧图表条件已替换，可在高级规则中继续调整。");
+    setMessage("已应用图表筛选：相同字段的旧图表条件已替换，可在全局筛选面板中继续调整。");
   }
 
   const selectedCount=columns.reduce((total,c)=>total+c.selected.length,0);
+  const advancedCount=ruleCount(advanced);
+  const filterCount=selectedCount+advancedCount;
+  const columnPreview=columns.flatMap(col=>col.selected.map(value=>({
+    field:fields.find(f=>f.field_id===col.field)?.label||col.field,
+    label:value==="__MISSING__"?"未记录":value
+  })));
   const sourceReady=!!status?.sources.length;
   const isRunning=starting||!!runId||!!status?.recent_scans.some(x=>["queued","running"].includes(x.status));
   const latestRun=run??status?.recent_scans.find(x=>["queued","running"].includes(x.status))??status?.recent_scans[0]??null;
@@ -372,21 +442,54 @@ export default function PhotoDataPage() {
       {message?<p role="alert" className="mt-3 text-sm text-textSecondary">{message}</p>:null}
     </section>
 
-    <section className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-      {[
-        ["逻辑拍摄次数",summary?.logical_captures],
-        ["物理文件数",summary?.physical_files],
-        ["RAW 文件数",summary?.raw_files],
-        ["图库容量",summary?Math.round(summary.total_bytes/(1024*1024))+" MiB":null]
-      ].map(([label,value])=><div key={String(label)} className="panel p-4">
-        <div className="text-xs text-textSecondary">{label}</div>
-        <div className="text-xl font-bold text-textPrimary mt-2">
-          {value==null?"—":typeof value==="number"?formatCount(value):value}
+    <section className="panel p-3 sm:p-4 space-y-3 photo-workspace-toolbar">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2" role="tablist" aria-label="拍摄数据工作区">
+          <button type="button" role="tab" aria-selected={workspace==="charts"}
+            className={workspace==="charts"?"button-primary":"button-secondary"}
+            onClick={()=>changeWorkspace("charts")}>统计分析</button>
+          <button type="button" role="tab" aria-selected={workspace==="files"}
+            className={workspace==="files"?"button-primary":"button-secondary"}
+            onClick={()=>changeWorkspace("files")}>照片明细</button>
         </div>
-      </div>)}
+        <button type="button" ref={filterButtonRef} className="button-secondary"
+          aria-haspopup="dialog" aria-expanded={filtersOpen} aria-controls="photo-global-filters"
+          onClick={()=>setFiltersOpen(true)}>
+          全局筛选{filterCount?" · "+filterCount+" 项":""}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2 items-center text-xs text-textSecondary">
+        <span className="shrink-0">当前范围：</span>
+        {columnPreview.slice(0,4).map((item,index)=>
+          <button type="button" key={index} className="rounded-full border border-line bg-panelAlt px-2.5 py-1 text-textPrimary hover:border-accent"
+            onClick={()=>{setMode("columns");setFiltersOpen(true);}}>{item.field}：{item.label}</button>)}
+        {columnPreview.length>4?<button type="button" className="text-accent" onClick={()=>setFiltersOpen(true)}>
+          另有 {columnPreview.length-4} 项
+        </button>:null}
+        {advancedCount>0?<button type="button" className="rounded-full border border-accent/40 bg-panelAlt px-2.5 py-1 text-textPrimary"
+          onClick={()=>{setMode("advanced");setFiltersOpen(true);}}>高级规则 · {advancedCount} 条</button>:null}
+        {!filterCount?<span>全部照片（未启用筛选）</span>:null}
+        <span className="ml-auto tabular-nums">匹配 {formatCount(summary?.logical_captures)} 次拍摄 · {formatCount(summary?.physical_files)} 个文件</span>
+        {filterCount?<button type="button" className="text-accent hover:underline"
+          onClick={()=>{setColumns(initialColumns);setAdvanced(emptyGroup());setPage(0);}}>清除条件</button>:null}
+      </div>
     </section>
 
-    <section className="panel p-5 space-y-4">
+    {filtersOpen?<div className="fixed inset-0 z-[80]">
+      <button type="button" aria-label="关闭筛选遮罩"
+        className="absolute inset-0 w-full h-full bg-black/60 cursor-default"
+        onClick={()=>setFiltersOpen(false)}/>
+      <aside id="photo-global-filters" ref={filterDrawerRef} role="dialog" aria-modal="true" aria-label="照片全局筛选"
+        className="absolute inset-y-0 right-0 w-full sm:w-[min(94vw,760px)] bg-panel border-l border-line shadow-2xl overflow-y-auto">
+        <header className="sticky top-0 z-10 p-4 sm:p-5 bg-panel border-b border-line flex items-center justify-between gap-3">
+          <div>
+            <div className="dashboard-kicker">Global Filter Tool</div>
+            <h2 className="text-xl font-semibold text-textPrimary mt-1">全局筛选</h2>
+            <p className="text-xs text-textSecondary mt-1">条件自动应用于统计分析和照片明细</p>
+          </div>
+          <button type="button" className="button-secondary" onClick={()=>setFiltersOpen(false)}>完成 / 关闭</button>
+        </header>
+        <div className="p-4 sm:p-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="dashboard-kicker">Metadata Filter</div>
@@ -455,41 +558,18 @@ export default function PhotoDataPage() {
             onClick={()=>void deletePhotoPreset(p.id).then(()=>getPhotoPresets()).then(setPresets).catch(e=>setMessage(showError(e)))}>×</button>
         </span>)}
       </div>:null}
-    </section>
+    
+        </div>
+      </aside>
+    </div>:null}
 
-    <PhotoAnalyticsDashboard filter={filter} refresh={refresh} onApplyRules={applyChartFilter}/>
-
-    <section className="panel p-5 overflow-x-auto photo-results" aria-busy={loading}>
-      <div className="flex items-center justify-between gap-3">
-        <div><div className="dashboard-kicker">Indexed Files</div>
-          <h2 className="mt-1 text-xl font-semibold text-textPrimary">文件元数据</h2></div>
-        <div className="text-xs text-textSecondary">仅展示 SQL 索引，不访问源文件</div>
-      </div>
-      <table className="mt-4 w-full min-w-[760px] text-left text-sm">
-        <thead className="text-textSecondary border-b border-line">
-          <tr>{["文件名","拍摄时间","相机","镜头","类型","ISO","光圈","焦距","大小"].map(h=><th key={h} className="px-2 py-3">{h}</th>)}</tr>
-        </thead>
-        <tbody>{results?.items.map(file=><tr key={file.id} className="border-b border-line/50 text-textPrimary">
-          <td className="px-2 py-3 max-w-44 truncate" title={file.relpath}>{file.filename}</td>
-          <td className="px-2 py-3 whitespace-nowrap">{file.shot_at?.slice(0,16)||"—"}</td>
-          <td className="px-2 py-3">{file.camera_model||"—"}</td>
-          <td className="px-2 py-3 max-w-48 truncate">{file.lens_model||"—"}</td>
-          <td className="px-2 py-3 uppercase">{file.format_family}</td>
-          <td className="px-2 py-3">{file.iso??"—"}</td>
-          <td className="px-2 py-3">{file.aperture?"F"+file.aperture:"—"}</td>
-          <td className="px-2 py-3">{file.focal_mm?file.focal_mm+" mm":"—"}</td>
-          <td className="px-2 py-3">{(file.size_bytes/1048576).toFixed(1)} MiB</td>
-        </tr>)}</tbody>
-      </table>
-      {loading?<p role="status" className="text-xs text-accent mt-3">正在更新文件结果…</p>:null}
-      {!loading&&!results?.items.length?<p className="py-6 text-center text-sm text-textSecondary">没有匹配的索引照片。</p>:null}
-      <div className="flex justify-between items-center mt-4">
-        <button className="button-secondary" type="button" disabled={loading||page===0}
-          onClick={()=>setPage(x=>Math.max(0,x-1))}>上一页</button>
-        <span className="text-xs text-textSecondary">第 {page+1} 页</span>
-        <button className="button-secondary" type="button" disabled={loading||!results||results.total_files<=(page+1)*40}
-          onClick={()=>setPage(x=>x+1)}>下一页</button>
-      </div>
-    </section>
+    {workspace==="charts"?
+      <PhotoAnalyticsDashboard filter={filter} refresh={refresh} onApplyRules={applyChartFilter}/>:
+      <PhotoMetadataExplorer
+        results={results} loading={loading} page={page} pageSize={pageSize}
+        search={fileSearch} onSearchChange={value=>{setFileSearch(value);setPage(0);}}
+        onPageChange={setPage} onPageSizeChange={value=>{setPageSize(value);setPage(0);}}
+        onExport={()=>void exportPhotoData(fileFilter).catch(e=>setMessage(showError(e)))}/>
+    }
   </div>;
 }
