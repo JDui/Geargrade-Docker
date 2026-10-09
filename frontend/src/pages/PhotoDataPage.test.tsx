@@ -26,8 +26,11 @@ const run = (): api.PhotoScan => ({
   directories_seen:2,phase:"enumerating",workers:3,active_workers:2,enumeration_done:0,rate_files_per_sec:5
 });
 function mount() { return render(<MemoryRouter><PhotoDataPage/></MemoryRouter>); }
-async function ready() { await waitFor(()=>expect(screen.getAllByLabelText("列字段")[0]).toHaveValue("capture.month")); }
-function lastFilter() { return vi.mocked(api.getPhotoQuery).mock.calls.at(-1)![0]; }
+async function ready() {
+  fireEvent.click(await screen.findByRole("button",{name:/全局筛选/}));
+  await waitFor(()=>expect(screen.getAllByLabelText("列字段")[0]).toHaveValue("capture.month"));
+}
+function lastFilter() { return vi.mocked(api.getPhotoSummary).mock.calls.at(-1)![0]; }
 
 describe("PhotoDataPage regressions", () => {
   beforeEach(()=>{
@@ -102,4 +105,48 @@ describe("PhotoDataPage regressions", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuetext","扫描已停止，文件总量未确定");
     expect(screen.getByRole("progressbar").firstElementChild).not.toHaveClass("photo-scan-indeterminate");
   });
+
+  it("starts in analytics and does not query file rows until opening the file workspace",async()=>{
+    mount();
+    await screen.findByRole("tab",{name:"统计分析"});
+    expect(screen.getByText("Analytics")).toBeInTheDocument();
+    expect(screen.queryByText("照片明细", {selector:"h2"})).not.toBeInTheDocument();
+    expect(api.getPhotoQuery).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab",{name:"照片明细"}));
+    expect(await screen.findByRole("heading",{name:"照片明细"})).toBeInTheDocument();
+    await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("tab",{name:"统计分析"}));
+    expect(screen.getByText("Analytics")).toBeInTheDocument();
+    expect(screen.queryByRole("heading",{name:"照片明细"})).not.toBeInTheDocument();
+  });
+
+  it("keeps global filter conditions across analytics and file workspaces",async()=>{
+    mount();await ready();
+    const column=screen.getAllByLabelText("列字段")[0].parentElement!.parentElement!;
+    fireEvent.click(await within(column).findByRole("checkbox"));
+    await waitFor(()=>expect(lastFilter().group).toMatchObject({children:[{field:"capture.month",op:"in",value:["sample"]}]}));
+    fireEvent.click(screen.getByRole("button",{name:"完成 / 关闭"}));
+    fireEvent.click(screen.getByRole("tab",{name:"照片明细"}));
+    await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledWith(
+      expect.objectContaining({group:expect.objectContaining({children:expect.arrayContaining([
+        expect.objectContaining({field:"capture.month",op:"in",value:["sample"]})
+      ])})}),40,0));
+    expect(screen.getByRole("button",{name:/全局筛选/})).toHaveTextContent("1 项");
+    fireEvent.click(screen.getByRole("tab",{name:"统计分析"}));
+    expect(screen.getByText("Analytics")).toBeInTheDocument();
+  });
+
+  it("applies file name search only to file queries and keeps global summary untouched",async()=>{
+    mount();
+    fireEvent.click(await screen.findByRole("tab",{name:"照片明细"}));
+    await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalled());
+    const summaries=vi.mocked(api.getPhotoSummary).mock.calls.length;
+    fireEvent.change(screen.getByRole("searchbox",{name:"文件名或相对路径搜索"}),{target:{value:"A7M4"}});
+    await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledWith(
+      expect.objectContaining({group:expect.objectContaining({children:expect.arrayContaining([
+        expect.objectContaining({field:"files.relpath",op:"contains",value:"A7M4"})
+      ])})}),40,0));
+    expect(vi.mocked(api.getPhotoSummary).mock.calls.length).toBe(summaries);
+  });
+
 });
