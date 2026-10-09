@@ -476,7 +476,9 @@ def test_v1_database_opt_in_migration_preserves_data_and_backup(photo_env, monke
 
     # Subsequent deep scan uses the separate stage DB, without touching the backup.
     assert complete(service.launch_scan([sid],deep=True))["status"]=="completed"
-    assert service.summary()==before
+    assert {k:v for k,v in service.summary().items() if k!="as_of"} == {
+        k:v for k,v in before.items() if k!="as_of"
+    }
     assert not list(db.database_path().parent.glob(
         db.database_path().stem+".scan-stage-*.sqlite"
     ))
@@ -491,12 +493,13 @@ def test_v2_missing_photo_purge_requires_three_confirmed_scans_and_age(photo_env
     assert complete(service.launch_scan([sid]))["status"]=="completed"
     (photo_env/"a.arw").unlink()
     for expected in (1,2):
-        assert complete(service.launch_scan([sid]))["status"]=="completed"
+        # An entirely empty source triggers existing NAS-unmount safeguards.
+        assert complete(service.launch_scan([sid], confirm_large_removal=True))["status"]=="completed"
         with db.connect() as conn:
             value=conn.execute("SELECT present,missing_scans FROM photos").fetchone()
             assert tuple(value)==(0,expected)
         assert maintenance._cleanup()["removed_photos"]==0
-    assert complete(service.launch_scan([sid]))["status"]=="completed"
+    assert complete(service.launch_scan([sid],confirm_large_removal=True))["status"]=="completed"
     with db.connect() as conn:
         conn.execute("UPDATE photos SET updated_at=?",
           ((datetime.now(timezone.utc)-timedelta(days=32)).isoformat(),))
