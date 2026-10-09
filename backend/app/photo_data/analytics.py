@@ -228,7 +228,7 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
                  source="selected_files"),
             "resolution": _buckets(db,
                 "(width_px*height_px/1000000.0)", MP_EDGES,
-                "files.width_px", where="width_px>0 AND height_px>0"),
+                "files.megapixels", where="width_px>0 AND height_px>0"),
             "orientation": grouped(db, """
                 SELECT CASE WHEN width_px IS NULL OR height_px IS NULL
                                   OR width_px<=0 OR height_px<=0 THEN '未知'

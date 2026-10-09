@@ -358,7 +358,8 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules}:{
             ...rangeRules("exposure.focal_mm",focalRanges[x][0],focalRanges[x][1]),
             ...rangeRules("exposure.aperture",apRanges[y][0],apRanges[y][1])
           ])}/>
-        <Ranking title="白平衡设置" desc="相机白平衡 EXIF 值" items={d.exposure.wb}/>
+        <Ranking title="白平衡设置" desc="相机白平衡 EXIF 值" items={d.exposure.wb}
+          onChoose={name=>choose("camera.white_balance",name)}/>
         <Ranking title="对焦模式" desc="厂商扩展标签可用性因机型而异" items={d.exposure.focus}
           onChoose={name=>choose("camera.focus_mode",name)}/>
         <Ranking title="连拍与驱动模式" desc="单拍或连拍等机内设置" items={d.exposure.drive}
@@ -373,7 +374,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules}:{
           onChoose={name=>choose("files.format_family",name)}/>
         <Donut title="拍摄主文件格式" desc="每次拍摄只选一个代表文件（元数据完整度优先）" items={d.files.capture_formats}/>
         <Buckets title="文件大小分布" desc="单位 MiB，按物理文件统计" items={d.files.size} onChoose={bin}/>
-        <Buckets title="分辨率分布" desc="照片元数据宽高相乘，单位百万像素" items={d.files.resolution}/>
+        <Buckets title="分辨率分布" desc="照片元数据宽高相乘，单位百万像素" items={d.files.resolution} onChoose={bin}/>
         <Donut title="横竖拍占比" desc="通过 EXIF 像素宽高判定，未知项单独显示" items={d.files.orientation}/>
         <Donut title="画面长宽比" desc="3:2、4:3、16:9、1:1 等常见画幅" items={d.files.aspect}/>
         <Donut title="EXIF 解析成功率" desc="按物理文件计算的解析状态" items={d.files.status}
@@ -388,7 +389,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules}:{
             "ISO":"exposure.iso","光圈":"exposure.aperture",
             "快门":"exposure.shutter","焦距":"exposure.focal_mm",
             "曝光补偿":"exposure.compensation","分辨率":"files.width_px",
-            "闪光灯":"exposure.flash","对焦模式":"camera.focus_mode"
+            "闪光灯":"exposure.flash","白平衡":"camera.white_balance","对焦模式":"camera.focus_mode"
           };
           if(fields[name])onApplyRules([{field:fields[name],op:"is_missing"}]);
         }}/>
