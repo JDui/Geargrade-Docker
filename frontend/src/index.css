@@ -1498,3 +1498,65 @@ body {
   outline-offset: 2px;
 }
 .photo-data-page [role="dialog"] { color: rgb(var(--color-text-primary)); }
+
+
+/* Multi-year photo heatmap controls: consistent legibility in both themes. */
+.photo-year-range-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 20px;
+  background: transparent;
+  accent-color: rgb(var(--color-accent));
+  cursor: ew-resize;
+}
+.photo-year-range-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid rgb(var(--color-line));
+  border-radius: 9999px;
+  background: rgb(var(--color-panel));
+}
+.photo-year-range-slider::-moz-range-track {
+  height: 6px;
+  border: 1px solid rgb(var(--color-line));
+  border-radius: 9999px;
+  background: rgb(var(--color-panel));
+}
+.photo-year-range-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  margin-top: -6px;
+  border: 3px solid rgb(var(--color-panel));
+  background: rgb(var(--color-accent));
+  box-shadow: 0 0 0 1px rgb(var(--color-accent));
+}
+.photo-year-range-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 3px solid rgb(var(--color-panel));
+  background: rgb(var(--color-accent));
+  box-shadow: 0 0 0 1px rgb(var(--color-accent));
+}
+.photo-year-range-slider:focus-visible {
+  outline: 2px solid rgb(var(--color-accent));
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.photo-year-range-slider:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.photo-calendar-day {
+  transition: outline-color 120ms ease, filter 120ms ease, box-shadow 120ms ease;
+}
+.photo-calendar-day:hover,
+.photo-calendar-day:focus-visible {
+  filter: brightness(1.25);
+  box-shadow: 0 0 0 1px rgb(var(--color-accent));
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-calendar-day { transition: none; }
+}
