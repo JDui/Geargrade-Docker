@@ -15,6 +15,9 @@ vi.mock("../api/photoData", async importOriginal => {
 vi.mock("../components/photo-data/PhotoAnalyticsDashboard", () => ({
   PhotoAnalyticsDashboard: () => <div>Analytics</div>
 }));
+vi.mock("../components/photo-data/PhotoDatabaseMaintenance", () => ({
+  PhotoDatabaseMaintenance: () => <div>Database Maintenance</div>
+}));
 const fields: api.PhotoField[] = [
   ["capture.month", "月份", "enum"], ["camera.model_norm", "机身", "enum"],
   ["lens.model_norm", "镜头", "enum"], ["files.format_family", "格式", "enum"],
