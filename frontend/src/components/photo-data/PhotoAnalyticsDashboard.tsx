@@ -308,7 +308,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules}:{
           onChoose={name=>choose("capture.hour",name.slice(0,2))}/>
         <Ranking title="星期使用分布" desc="周一至周日"
           items={weekdays.map((name,i)=>({name,count:d.timeline.weekdays.find(v=>v.weekday===i)?.count||0}))}
-          onChoose={name=>choose("capture.weekday",String(weekdays.indexOf(name)))}/>
+          onChoose={name=>onApplyRules([{field:"capture.weekday",op:"eq",value:weekdays.indexOf(name)}])}/>
         <Heat title="星期 × 小时热力图" desc="星期为行，24 小时为列；点击任意格子筛选"
           xs={Array.from({length:24},(_,i)=>String(i).padStart(2,"0"))} ys={weekdays}
           data={d.timeline.weekday_hour.map(x=>({x:x.hour,y:x.weekday,count:x.count}))}

@@ -218,11 +218,25 @@ export default function PhotoDataPage() {
 
   function applyChartFilter(rules:PhotoRule[]) {
     if(!rules.length)return;
-    setAdvanced(current=>isGroup(current)&&current.op==="and"
-      ? {op:"and",children:[...current.children,...rules]}
-      : {op:"and",children:[current,...rules]});
+    const fields=new Set(rules.flatMap(rule=>"field" in rule?[rule.field]:[]));
+    // A chart replaces only its previous chart rules for matching fields.
+    // Explicitly authored advanced rules for other purposes remain intact.
+    const marked=rules.map(rule=>"field" in rule
+      ? {...rule,column_id:"chart:"+rule.field}
+      : rule);
+    setColumns(current=>current.map(column=>fields.has(column.field)
+      ? {...column,selected:[]} : column));
+    setAdvanced(current=>{
+      const children=isGroup(current)&&current.op==="and" ? current.children : [current];
+      const kept=children.filter(child=>!("column_id" in child
+        && typeof child.column_id==="string"
+        && child.column_id.startsWith("chart:")
+        && fields.has(child.column_id.slice(6))));
+      return {op:"and",children:[...kept,...marked]};
+    });
     setMode("advanced");
     setPage(0);
+    setMessage("已应用图表筛选：相同字段的旧图表条件已替换，可在高级规则中继续调整。");
   }
 
   const selectedCount=columns.reduce((total,c)=>total+c.selected.length,0);
