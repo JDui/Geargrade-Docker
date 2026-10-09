@@ -58,6 +58,58 @@ EXIF_STRUCTURED_TAGS = {
 }
 EXIF_EXTENSION_TAGS = frozenset(EXIF_TAGS) - EXIF_STRUCTURED_TAGS
 
+# Consistent 35mm-equivalent focal length for analytics AND cross-filters.
+# Prefer camera-reported EXIF; fall back only for unambiguous camera families.
+# Unknown-sensor cameras remain NULL, never silently treated as full frame.
+_FOCAL_MODEL = "UPPER(COALESCE(camera_model,''))"
+_FOCAL_MAKE = "UPPER(COALESCE(camera_make,''))"
+CROP_FACTOR_SQL = f"""CASE
+  WHEN {_FOCAL_MODEL} LIKE 'ILCE-7%' OR {_FOCAL_MODEL} LIKE 'ILCE-9%'
+       OR {_FOCAL_MODEL} LIKE 'ILCE-1' OR {_FOCAL_MODEL} LIKE 'ZV-E1%'
+       OR {_FOCAL_MODEL} LIKE 'DSC-RX1%' THEN 1.0
+  WHEN {_FOCAL_MODEL} LIKE 'ILCE-6%' OR {_FOCAL_MODEL} LIKE 'ILCE-5%'
+       OR {_FOCAL_MODEL} LIKE 'ZV-E10%' OR {_FOCAL_MODEL} LIKE 'NEX-%' THEN 1.5
+  WHEN {_FOCAL_MODEL} LIKE 'X100%' OR {_FOCAL_MODEL} LIKE 'X-T%'
+       OR {_FOCAL_MODEL} LIKE 'X-H%' OR {_FOCAL_MODEL} LIKE 'X-E%'
+       OR {_FOCAL_MODEL} LIKE 'X-S%' OR {_FOCAL_MODEL} LIKE 'X-PRO%' THEN 1.5
+  WHEN {_FOCAL_MODEL} LIKE 'GFX%' THEN 0.79
+  WHEN ({_FOCAL_MAKE} LIKE 'OLYMPUS%' OR {_FOCAL_MAKE} LIKE 'OM DIGITAL%')
+       AND ({_FOCAL_MODEL} LIKE 'E-%' OR {_FOCAL_MODEL} LIKE 'OM-%'
+            OR {_FOCAL_MODEL} LIKE 'PEN-%') THEN 2.0
+  WHEN ({_FOCAL_MAKE} LIKE 'PANASONIC%' OR {_FOCAL_MAKE} LIKE 'LEICA%')
+       AND ({_FOCAL_MODEL} LIKE 'DC-G%' OR {_FOCAL_MODEL} LIKE 'DMC-G%'
+            OR {_FOCAL_MODEL} LIKE 'DMC-GH%' OR {_FOCAL_MODEL} LIKE 'DMC-GX%') THEN 2.0
+  WHEN {_FOCAL_MODEL} LIKE 'DC-S%' OR {_FOCAL_MODEL} LIKE 'LEICA SL%' THEN 1.0
+  WHEN {_FOCAL_MODEL} LIKE 'NIKON Z F%' OR {_FOCAL_MODEL} LIKE 'NIKON Z 5%'
+       OR {_FOCAL_MODEL} LIKE 'NIKON Z 6%' OR {_FOCAL_MODEL} LIKE 'NIKON Z 7%'
+       OR {_FOCAL_MODEL} LIKE 'NIKON Z 8%' OR {_FOCAL_MODEL} LIKE 'NIKON Z 9%'
+       OR {_FOCAL_MODEL} LIKE 'NIKON Z 30%' OR {_FOCAL_MODEL} LIKE 'NIKON Z 50%'
+       OR {_FOCAL_MODEL} LIKE 'NIKON Z FC%' THEN
+       CASE WHEN {_FOCAL_MODEL} LIKE 'NIKON Z 30%' OR {_FOCAL_MODEL} LIKE 'NIKON Z 50%'
+                 OR {_FOCAL_MODEL} LIKE 'NIKON Z FC%' THEN 1.5 ELSE 1.0 END
+  WHEN {_FOCAL_MODEL} LIKE 'CANON EOS R7%' OR {_FOCAL_MODEL} LIKE 'CANON EOS R10%'
+       OR {_FOCAL_MODEL} LIKE 'CANON EOS R50%' OR {_FOCAL_MODEL} LIKE 'CANON EOS R100%'
+       OR {_FOCAL_MODEL} LIKE 'CANON EOS M%' THEN 1.6
+  WHEN {_FOCAL_MODEL} LIKE 'CANON EOS R5%' OR {_FOCAL_MODEL} LIKE 'CANON EOS R6%'
+       OR {_FOCAL_MODEL} LIKE 'CANON EOS R8%' OR {_FOCAL_MODEL} LIKE 'CANON EOS R3%'
+       OR {_FOCAL_MODEL} LIKE 'CANON EOS R1%' OR {_FOCAL_MODEL} LIKE 'CANON EOS RP%'
+       THEN 1.0
+  ELSE NULL END"""
+# SQLite JSON1 is present in supported Python builds. Keep all JSON paths static.
+_EXPLICIT_EQ = """CASE WHEN json_valid(tags_json)
+    THEN CAST(json_extract(tags_json, '$.FocalLengthIn35mmFormat') AS REAL)
+    ELSE NULL END"""
+FOCAL_EQ_SQL = (f"""CASE
+  WHEN {_EXPLICIT_EQ} > 0 AND {_EXPLICIT_EQ} < 5000 THEN {_EXPLICIT_EQ}
+  WHEN focal_mm > 0 AND focal_mm < 5000 AND ({CROP_FACTOR_SQL}) > 0
+    THEN focal_mm * ({CROP_FACTOR_SQL})
+  ELSE NULL END""")
+FOCAL_EQ_SOURCE_SQL = (f"""CASE
+  WHEN {_EXPLICIT_EQ} > 0 AND {_EXPLICIT_EQ} < 5000 THEN 'EXIF'
+  WHEN focal_mm > 0 AND focal_mm < 5000 AND ({CROP_FACTOR_SQL}) > 0
+    THEN 'camera_profile'
+  ELSE 'unknown' END""")
+
 COLUMNS = (
     "source_id", "relpath", "filename", "ext", "format_family", "size_bytes",
     "mtime_ns", "capture_key", "shot_at", "camera_make", "camera_model",
@@ -90,6 +142,7 @@ FIELDS: dict[str, tuple[str, str, str]] = {
     "exposure.aperture": ("aperture", "number", "光圈 F"),
     "exposure.shutter": ("shutter", "number", "快门（秒）"),
     "exposure.focal_mm": ("focal_mm", "number", "焦距（mm）"),
+    "exposure.focal_eq_mm": (FOCAL_EQ_SQL, "number", "35mm 等效焦距（mm）"),
     "exposure.compensation": ("exposure_comp", "number", "曝光补偿（EV）"),
     "exposure.flash": ("flash", "enum", "闪光"),
     "camera.focus_mode": ("focus_mode", "enum", "对焦模式"),
