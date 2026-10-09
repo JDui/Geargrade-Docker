@@ -192,6 +192,16 @@ def test_ten_thousand_files_adaptive_parallel_index(photo_env, monkeypatch):
     assert second["unchanged"] == 10000
     assert second["extracted"] == 0
 
+    # Aggregation also runs server-side over all 10,000 logical captures.
+    # These are synthetic files with mocked EXIF, not actual RAW benchmarks.
+    from app.photo_data.analytics import analyze
+    analytics = analyze()
+    assert analytics["overview"]["captures"] == 10000
+    assert analytics["overview"]["files"] == 10000
+    assert sum(item["count"] for item in analytics["exposure"]["iso"]) == 10000
+    assert sum(item["count"] for item in analytics["timeline"]["yearly"]) == 10000
+    assert sum(item["count"] for item in analytics["gear"]["cameras"]) == 10000
+
 
 def test_analytics_all_views_and_physical_vs_capture(photo_env, monkeypatch):
     """Every analytics view uses the published index and correct count denominators."""
