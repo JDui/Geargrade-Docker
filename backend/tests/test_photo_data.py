@@ -138,3 +138,56 @@ def test_split_failed_batch():
         assert "tags" in result[0] and "error" in result[1] and "tags" in result[2]
     finally:
         service.extract_batch=original
+
+
+def test_ten_thousand_files_adaptive_parallel_index(photo_env, monkeypatch):
+    """Stress smoke test for 10k indexed photos (mock EXIF, not RAW decode speed)."""
+    import threading
+
+    for index in range(10000):
+        (photo_env / f"photo_{index:05d}.arw").write_bytes(b"raw")
+
+    state = {"running": 0, "max_running": 0, "calls": 0}
+    lock = threading.Lock()
+
+    def timed_exif(paths):
+        with lock:
+            state["running"] += 1
+            state["calls"] += 1
+            state["max_running"] = max(state["max_running"], state["running"])
+        try:
+            time.sleep(0.025)
+            return fake_exif(paths)
+        finally:
+            with lock:
+                state["running"] -= 1
+
+    monkeypatch.setattr(service, "extract_batch", timed_exif)
+    monkeypatch.setattr(
+        scanner, "choose_scan_plan",
+        lambda root: scanner.ScanPlan("ext4", False, 4, 2, 48),
+    )
+    sid = service.add_source({"name": "Large photo archive", "root_path": str(photo_env)})["id"]
+
+    job_id = service.launch_scan([sid])
+    deadline = time.monotonic() + 100
+    while time.monotonic() < deadline:
+        current = service.get_scan(job_id)
+        if current["status"] not in ("queued", "running"):
+            break
+        time.sleep(0.1)
+    else:
+        pytest.fail("10k index did not finish in a reasonable synthetic test time")
+    assert current["status"] == "completed", current["error"]
+    assert current["seen"] == 10000
+    assert current["processed"] == 10000
+    assert current["extracted"] == 10000
+    assert 2 <= state["max_running"] <= 4
+    assert service.summary()["logical_captures"] == 10000
+    assert service.summary()["physical_files"] == 10000
+
+    second = complete(service.launch_scan([sid]))
+    assert second["status"] == "completed", second["error"]
+    assert second["seen"] == 10000
+    assert second["unchanged"] == 10000
+    assert second["extracted"] == 0
