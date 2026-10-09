@@ -96,13 +96,15 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
                    "shot_at,camera_make,camera_model,camera_norm,lens_model,lens_norm,"
                    "iso,aperture,shutter,focal_mm,exposure_comp,flash,wb,focus_mode,"
                    "shutter_type,drive_mode,picture_style,width_px,height_px,"
-                   "color_space,software FROM photos WHERE " + where, args)
+                   "color_space,software," + service.FOCAL_EQ_SQL + " AS focal_eq_mm," +
+                   service.FOCAL_EQ_SOURCE_SQL + " AS focal_eq_source "
+                   "FROM photos WHERE " + where, args)
         db.execute("CREATE INDEX sf_capture ON selected_files(capture_key,format_family)")
         # Prefer metadata-complete variants within a single RAW+JPEG logical capture.
         db.execute("""
             CREATE TEMP TABLE captures AS
             SELECT capture_key,shot_at,camera_make,camera_model,camera_norm,lens_model,
-                   lens_norm,iso,aperture,shutter,focal_mm,exposure_comp,flash,wb,
+                   lens_norm,iso,aperture,shutter,focal_mm,focal_eq_mm,focal_eq_source,exposure_comp,flash,wb,
                    focus_mode,shutter_type,drive_mode,picture_style,width_px,
                    height_px,color_space,software,format_family
             FROM (
@@ -186,7 +188,10 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
         }
         exposure = {
             "iso": _buckets(db,"iso",ISO_EDGES,"exposure.iso"),
-            "focal": _buckets(db,"focal_mm",FOCAL_EDGES,"exposure.focal_mm"),
+            "focal": _buckets(db,"focal_eq_mm",FOCAL_EDGES,"exposure.focal_eq_mm"),
+            "focal_coverage": grouped(db,
+                "SELECT focal_eq_source AS name,COUNT(*) AS count FROM captures "
+                "WHERE focal_mm IS NOT NULL GROUP BY focal_eq_source ORDER BY count DESC"),
             "aperture": _buckets(db,"aperture",APERTURE_EDGES,"exposure.aperture"),
             "shutter": _buckets(db,"shutter",SHUTTER_EDGES,"exposure.shutter",_duration_label),
             "ev": _buckets(db,"exposure_comp",EV_EDGES,"exposure.compensation"),
@@ -207,12 +212,12 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
                 GROUP BY x,y ORDER BY x,y
             """),
             "focal_aperture": grouped(db, """
-                SELECT CASE WHEN focal_mm<24 THEN 0 WHEN focal_mm<50 THEN 1
-                  WHEN focal_mm<100 THEN 2 WHEN focal_mm<200 THEN 3 ELSE 4 END AS x,
+                SELECT CASE WHEN focal_eq_mm<24 THEN 0 WHEN focal_eq_mm<50 THEN 1
+                  WHEN focal_eq_mm<100 THEN 2 WHEN focal_eq_mm<200 THEN 3 ELSE 4 END AS x,
                 CASE WHEN aperture<2 THEN 0 WHEN aperture<4 THEN 1
                   WHEN aperture<8 THEN 2 WHEN aperture<16 THEN 3 ELSE 4 END AS y,
                 COUNT(*) AS count FROM captures
-                WHERE focal_mm IS NOT NULL AND aperture IS NOT NULL
+                WHERE focal_eq_mm IS NOT NULL AND aperture IS NOT NULL
                 GROUP BY x,y ORDER BY x,y
             """),
         }
