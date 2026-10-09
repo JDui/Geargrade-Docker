@@ -84,4 +84,4 @@ P2：高级分析与容量优化
 - SQLite WAL：https://sqlite.org/wal.html
 - Geargrade 当前工程：backend/app/main.py、backend/app/db/、backend/app/services/data_service.py、frontend/src/routes/AppRouter.tsx、frontend/src/components/layout/AppShell.tsx、frontend/src/pages/SettingsPage.tsx、docker-compose.yml。
 
-**注意：当前仓库只有设计文档，未实施 scanner、API、SQL 表或页面。正式编码前应以当时 main 版本重新校验入口与依赖版本。**
+**状态更新（1.0.0）**：基本扫描器、SQLite、REST API、页面、排行榜、进度与初步高级筛选已实现；本文件中尚未满足的全部验收条目继续保留为后续工作。已加入 GitHub Actions CI 与 10,000 文件模拟压力测试，但真实 RAW/NAS 性能和厂商 MakerNotes 仍需实物验证。
