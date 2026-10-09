@@ -1560,3 +1560,66 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .photo-calendar-day { transition: none; }
 }
+
+
+/* The photo modal is rendered in document.body so page-view transitions,
+   transforms, and fixed navigation cannot capture its fixed positioning. */
+.photo-modal-layer {
+  isolation: isolate;
+}
+.photo-modal-backdrop {
+  background: rgb(5 12 22 / 0.34);
+  -webkit-backdrop-filter: blur(9px) saturate(0.88);
+  backdrop-filter: blur(9px) saturate(0.88);
+  transition: background-color 180ms ease;
+}
+:root[data-theme="light"] .photo-modal-backdrop {
+  background: rgb(225 233 242 / 0.29);
+  -webkit-backdrop-filter: blur(12px) saturate(0.82);
+  backdrop-filter: blur(12px) saturate(0.82);
+}
+.photo-filter-modal {
+  max-width: 1380px;
+  max-height: calc(100dvh - 32px);
+  min-height: min(74dvh, 700px);
+  background: rgb(var(--color-panel));
+  box-shadow: 0 24px 85px rgb(0 0 0 / 0.20);
+}
+.photo-detail-modal {
+  max-width: 800px;
+  max-height: calc(100dvh - 32px);
+  height: min(850px, calc(100dvh - 32px));
+  background: rgb(var(--color-panel));
+  box-shadow: 0 24px 85px rgb(0 0 0 / 0.24);
+}
+.photo-modal-scroll {
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-text-secondary) / 0.55) transparent;
+}
+.photo-modal-scroll::-webkit-scrollbar {
+  width: 9px;
+}
+.photo-modal-scroll::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-text-secondary) / 0.36);
+  border-radius: 999px;
+  border: 2px solid rgb(var(--color-panel));
+}
+.photo-filter-modal .photo-view-enter {
+  animation-duration: 120ms;
+}
+@media (max-width: 640px) {
+  .photo-filter-modal,
+  .photo-detail-modal {
+    width: 100%;
+    max-height: calc(100dvh - 16px);
+    height: calc(100dvh - 16px);
+    min-height: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-modal-backdrop { transition: none; }
+}
