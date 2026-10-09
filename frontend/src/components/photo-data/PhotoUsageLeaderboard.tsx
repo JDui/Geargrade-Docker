@@ -55,10 +55,10 @@ export default function PhotoUsageLeaderboard() {
         <button className={sort_order==="desc"?"button-primary":"button-secondary"} type="button" onClick={()=>change({sort_order:"desc"})}>降序</button>
         <button className={sort_order==="asc"?"button-primary":"button-secondary"} type="button" onClick={()=>change({sort_order:"asc"})}>升序</button>
         <label className="text-sm text-textSecondary">起始日期
-          <input className="input-field ml-2" type="date" value={from} onChange={e=>setFrom(e.target.value)}/>
+          <input className="input ml-2" type="date" value={from} onChange={e=>setFrom(e.target.value)}/>
         </label>
         <label className="text-sm text-textSecondary">结束日期
-          <input className="input-field ml-2" type="date" value={to} onChange={e=>setTo(e.target.value)}/>
+          <input className="input ml-2" type="date" value={to} onChange={e=>setTo(e.target.value)}/>
         </label>
       </div>
       <p className="text-xs text-textSecondary">

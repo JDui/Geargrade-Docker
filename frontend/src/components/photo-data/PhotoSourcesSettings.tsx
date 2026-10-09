@@ -51,9 +51,9 @@ export function PhotoSourcesSettings() {
         </p>
       </div>
       <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
-        <input className="input-field min-w-0" aria-label="来源名称" placeholder="来源名称，例如 NAS 归档"
+        <input className="input min-w-0" aria-label="来源名称" placeholder="来源名称，例如 NAS 归档"
           value={name} onChange={(e)=>setName(e.target.value)} />
-        <input className="input-field min-w-0" aria-label="容器内的扫描路径" placeholder="/mnt/photo-library"
+        <input className="input min-w-0" aria-label="容器内的扫描路径" placeholder="/mnt/photo-library"
           value={rootPath} onChange={(e)=>setRootPath(e.target.value)} />
         <button className="button-primary" type="button" onClick={()=>void create()} disabled={!rootPath.trim()||saving}>
           添加目录

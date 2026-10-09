@@ -30,7 +30,7 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
   if (isGroup(rule)) {
     return <div className="space-y-2 border-l-2 border-accent/30 pl-3 py-2">
       <div className="flex flex-wrap gap-2 items-center">
-        <select className="input-field" aria-label="条件组逻辑" value={rule.op}
+        <select className="input" aria-label="条件组逻辑" value={rule.op}
           onChange={(e)=>onChange({op:e.target.value as "and"|"or"|"not",children:e.target.value==="not"?rule.children.slice(0,1):rule.children})}>
           <option value="and">全部满足 (AND)</option><option value="or">任意满足 (OR)</option>
           <option value="not">排除组 (NOT)</option>
@@ -56,10 +56,10 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
     onChange({field,op:"eq",value:matched?.value_type==="number"?0:""});
   };
   return <div className="flex flex-wrap items-center gap-2 rounded-xl bg-panelAlt/80 p-2">
-    <select className="input-field max-w-full" aria-label="筛选字段" value={rule.field} onChange={e=>changeField(e.target.value)}>
+    <select className="input max-w-full" aria-label="筛选字段" value={rule.field} onChange={e=>changeField(e.target.value)}>
       {fields.map(f=><option key={f.field_id} value={f.field_id}>{f.label}</option>)}
     </select>
-    <select className="input-field" aria-label="筛选操作符" value={op}
+    <select className="input" aria-label="筛选操作符" value={op}
       onChange={e=>onChange({field:rule.field,op:e.target.value,
         ...(e.target.value==="is_missing"||e.target.value==="is_present"?{}:{value:e.target.value==="between"?[0,100]:(isNum?0:"")})})}>
       <option value="eq">等于</option><option value="ne">不等于</option>
@@ -71,7 +71,7 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
     </select>
     {op!=="is_missing"&&op!=="is_present"?(op==="between"?
       <div className="flex gap-2 items-center">
-        {[0,1].map(index=><input key={index} className="input-field w-24" aria-label={index?"最大值":"最小值"}
+        {[0,1].map(index=><input key={index} className="input w-24" aria-label={index?"最大值":"最小值"}
           type={isNum?"number":"text"} value={String(twoValues[index]??"")}
           onChange={e=>{
             const next=[...twoValues] as Array<string|number>;
@@ -79,7 +79,7 @@ function AdvancedRules({rule,fields,onChange,onRemove,level=0}:{
             onChange({field:rule.field,op:rule.op,value:next});
           }}/>)}
       </div>:
-      <input className="input-field w-36" aria-label="比较值" type={isNum?"number":"text"}
+      <input className="input w-36" aria-label="比较值" type={isNum?"number":"text"}
         value={String(rule.value??"")} onChange={e=>onChange({field:rule.field,op:rule.op,
           value:isNum?Number(e.target.value):e.target.value})}/>
     ):null}
@@ -243,7 +243,7 @@ export default function PhotoDataPage() {
           <p className="mt-2 text-xs text-textSecondary">上次成功扫描：{displayDate(status?.last_success)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select aria-label="扫描模式" className="input-field" value={scanMode} onChange={e=>setScanMode(e.target.value)}
+          <select aria-label="扫描模式" className="input" value={scanMode} onChange={e=>setScanMode(e.target.value)}
             disabled={isRunning}>
             <option value="incremental">增量扫描</option><option value="deep">深度重扫</option>
           </select>
@@ -336,7 +336,7 @@ export default function PhotoDataPage() {
         <div className="flex gap-3 overflow-x-auto pb-2">
           {columns.map(col=><div key={col.id} className="shrink-0 w-56 rounded-xl border border-line bg-panelAlt/60 p-3 space-y-2">
             <div className="flex items-center gap-1">
-              <select className="input-field min-w-0 flex-1" aria-label="列字段" value={col.field}
+              <select className="input min-w-0 flex-1" aria-label="列字段" value={col.field}
                 onChange={e=>{setColumns(items=>items.map(item=>item.id===col.id?{...item,field:e.target.value,selected:[]}:item));setPage(0);}}>
                 {fields.map(f=><option key={f.field_id} value={f.field_id}>{f.label}</option>)}
               </select>
