@@ -191,3 +191,95 @@ def test_ten_thousand_files_adaptive_parallel_index(photo_env, monkeypatch):
     assert second["seen"] == 10000
     assert second["unchanged"] == 10000
     assert second["extracted"] == 0
+
+
+def test_analytics_all_views_and_physical_vs_capture(photo_env, monkeypatch):
+    """Every analytics view uses the published index and correct count denominators."""
+    from app.photo_data.analytics import analyze
+
+    for name in ("a.arw", "a.jpg", "b.raf", "c.heic"):
+        (photo_env / name).write_bytes(b"image")
+
+    def tags(paths):
+        out = []
+        for path in paths:
+            name = Path(path).name
+            common = {
+                "DateTimeOriginal": "2025:03:17 14:20:00",
+                "Make": "SONY", "Model": "ILCE-7M4",
+                "LensModel": "FE 35mm F1.8",
+                "ISO": 1600, "ExposureTime": 0.004, "FNumber": 2.0,
+                "FocalLength": 35, "ImageWidth": 6000, "ImageHeight": 4000,
+                "Flash": "Off",
+                "GPSLongitude": 121.5,
+            }
+            if name.startswith("b"):
+                common.update(DateTimeOriginal="2024:10:09 20:00:00",
+                              ISO=400, LensModel="Tamron 28-200mm", FocalLength=200)
+            elif name.startswith("c"):
+                common = {"DateTimeOriginal": "2025:03:18 09:00:00",
+                          "ImageWidth": 4000, "ImageHeight": 6000}
+            out.append(common)
+        return out
+
+    monkeypatch.setattr(service, "extract_batch", tags)
+    sid = service.add_source({"name": "Analytics sample", "root_path": str(photo_env)})["id"]
+    result = complete(service.launch_scan([sid]))
+    assert result["status"] == "completed", result["error"]
+
+    details = analyze()
+    assert details["overview"]["files"] == 4
+    assert details["overview"]["captures"] == 3
+    assert details["overview"]["raw_files"] == 2
+    assert details["overview"]["raw_captures"] == 2
+    assert details["overview"]["paired_captures"] == 1
+    assert sum(x["count"] for x in details["files"]["formats"]) == 4
+    assert sum(x["count"] for x in details["files"]["capture_formats"]) == 3
+    assert sum(x["count"] for x in details["timeline"]["yearly"]) == 3
+    assert sum(x["count"] for x in details["timeline"]["weekday_hour"]) == 3
+    assert sum(x["count"] for x in details["exposure"]["iso"]) == 2
+    assert sum(x["count"] for x in details["exposure"]["iso_shutter"]) == 2
+    assert sum(x["count"] for x in details["exposure"]["focal_aperture"]) == 2
+    assert sum(x["count"] for x in details["files"]["orientation"]) == 3
+    assert details["quality"][0]["count"] == 3
+    assert next(x for x in details["quality"] if x["name"] == "镜头")["count"] == 2
+    assert "GPS" not in str(details)
+
+
+def test_analytics_filtered_consistently_and_no_source_access(photo_env, monkeypatch):
+    from app.photo_data.analytics import analyze
+
+    for name in ("a.arw","a.jpg","b.nef"):
+        (photo_env / name).write_bytes(b"demo")
+    monkeypatch.setattr(service,"extract_batch",fake_exif)
+    sid=service.add_source({"name":"Archive","root_path":str(photo_env)})["id"]
+    assert complete(service.launch_scan([sid]))["status"] == "completed"
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("analytics accessed the original photo folder")
+    monkeypatch.setattr(os,"scandir",forbidden)
+
+    filtered = {"version":"photo-filter.v1","group":{"op":"and","children":[
+        {"field":"capture.month","op":"eq","value":"2025-01"},
+        {"field":"exposure.iso","op":"gte","value":1600}
+    ]}}
+    result=analyze(filtered)
+    assert result["overview"]["captures"] == 2
+    assert result["overview"]["files"] == 3
+    assert result["overview"]["paired_captures"] == 1
+
+    impossible={"version":"photo-filter.v1","group":{
+        "field":"exposure.iso","op":"gt","value":999999}}
+    empty=analyze(impossible)
+    assert empty["overview"]["captures"] == 0
+    assert empty["timeline"]["daily"] == []
+    assert empty["gear"]["combos"] == []
+    assert sum(x["count"] for x in empty["exposure"]["iso"]) == 0
+
+
+def test_analytics_source_filter_cannot_execute_sql(photo_env):
+    from app.photo_data.analytics import analyze
+    with pytest.raises(ValueError):
+        analyze({"version":"photo-filter.v1","group":{
+            "field":"camera_norm); DELETE FROM photos;--",
+            "op":"eq","value":"Sony"}})
