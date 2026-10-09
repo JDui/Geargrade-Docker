@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { PhotoSourcesSettings } from "../components/photo-data/PhotoSourcesSettings";
 
 import {
   type ContentWidth,
@@ -171,6 +172,7 @@ export default function SettingsPage() {
           ]}
         />
       </SettingsGroup>
+      <PhotoSourcesSettings />
     </div>
   );
 }

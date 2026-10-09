@@ -88,6 +88,9 @@ export function AppShell() {
             <NavLink to="/archive" className={navClassName}>
               档案库
             </NavLink>
+            <NavLink to="/photo-data" className={navClassName}>
+              拍摄数据
+            </NavLink>
             <NavLink to="/leaderboards" className={navClassName}>
               排行榜
             </NavLink>

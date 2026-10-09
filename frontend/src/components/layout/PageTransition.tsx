@@ -11,6 +11,9 @@ export function pageKey(pathname: string) {
   if (pathname.startsWith("/clist")) {
     return "clist";
   }
+  if (pathname.startsWith("/photo-data")) {
+    return "photo-data";
+  }
   if (pathname.startsWith("/leaderboards")) {
     return "leaderboards";
   }

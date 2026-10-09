@@ -7,6 +7,7 @@ import DataToolsPage from "../pages/DataToolsPage";
 import DashboardPage from "../pages/DashboardPage";
 import DeviceFormPage from "../pages/DeviceFormPage";
 import LeaderboardsPage from "../pages/LeaderboardsPage";
+import PhotoDataPage from "../pages/PhotoDataPage";
 import SettingsPage from "../pages/SettingsPage";
 import WishlistPage from "../pages/WishlistPage";
 
@@ -81,6 +82,7 @@ export function AppRouter() {
         <Route path="/wishlist/new" element={<DeviceFormPage mode="create" resource="wishlist" />} />
         <Route path="/wishlist/:deviceId/edit" element={<DeviceFormPage mode="edit" resource="wishlist" />} />
         <Route path="/wishlist/devices/:deviceId/redeem" element={<DeviceFormPage mode="redeem" resource="devices" />} />
+        <Route path="/photo-data" element={<PhotoDataPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/data-tools" element={<DataToolsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
