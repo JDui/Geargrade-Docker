@@ -73,6 +73,23 @@ export type PhotoAnalytics = {
   notes: { captures: string; files: string; time: string; gaps: string };
 };
 
+export type PhotoMaintenanceJob = {
+  id:string;operation:"migrate"|"cleanup"|"vacuum";status:"running"|"completed"|"failed";
+  phase:string;error?:string|null;backup_file?:string;started_at?:string;ended_at?:string;
+  result?:{message:string;backup_file?:string;removed_photos?:number;removed_scan_runs?:number;bytes_before?:number;bytes_after?:number};
+};
+export type PhotoMaintenanceStatus = {
+  schema_version:number;target_schema_version:number;migration_required:boolean;
+  db_bytes:number;wal_bytes:number;freelist_bytes:number;stage_bytes:number;
+  physical_files:number;active_photos:number;missing_photos:number;
+  eligible_for_purge:number;legacy_stage_rows:number;scan_runs:number;scan_active:boolean;
+  policy:{missing_confirmations:number;missing_days:number;retain_run_count:number;retain_run_days:number};
+  job:PhotoMaintenanceJob|null;
+};
+export const getPhotoMaintenance = () => apiGet<PhotoMaintenanceStatus>(path+"/maintenance/status");
+export const startPhotoMaintenance = (op:"migrate"|"cleanup"|"vacuum") =>
+  apiPost<PhotoMaintenanceJob>(path+"/maintenance/"+op,{confirm:true});
+
 export const getPhotoStatus = () => apiGet<PhotoStatus>(path + "/status");
 export const getPhotoFields = () => apiGet<PhotoField[]>(path + "/filter-fields");
 export const createPhotoSource = (name:string, root_path:string) => apiPost<PhotoSource>(path+"/sources", {name,root_path});
