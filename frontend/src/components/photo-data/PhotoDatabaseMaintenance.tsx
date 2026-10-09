@@ -84,6 +84,12 @@ export function PhotoDatabaseMaintenance({onUpdated,mode="manage"}:{
           查看升级提示
         </button>
       </div>:null}
+      {stats?.schema_version===stats?.target_schema_version&&mode==="manage"?<p className="text-xs leading-6 text-textSecondary">
+        v2 已启用独立扫描暂存与精简 EXIF。SQLite 不会因为迁移自动缩小文件；
+        {stats.freelist_bytes>0?("当前可复用空闲页约 "+bytes(stats.freelist_bytes)+"，"):"当前没有大量空闲页，"}
+        需要在无扫描任务时手动执行下方「压缩数据库」，而迁移备份不会自动删除。
+        {stats.backup_count>0?" 当前保留 "+stats.backup_count+" 份备份（共 "+bytes(stats.backup_bytes)+"）。":""}
+      </p>:null}
       {job?<div className="text-xs rounded-lg bg-panelAlt p-3 text-textSecondary" role="status">
         <span className="font-semibold text-textPrimary">
           {job.operation==="migrate"?"数据库迁移":job.operation==="cleanup"?"清理历史":"数据库压缩"}：
@@ -99,6 +105,8 @@ export function PhotoDatabaseMaintenance({onUpdated,mode="manage"}:{
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
           {[
             ["主库文件",bytes(stats.db_bytes)],
+            ["磁盘总占用",bytes(stats.storage_bytes)],
+            ["迁移备份",stats.backup_count+" 份 / "+bytes(stats.backup_bytes)],
             ["WAL 日志",bytes(stats.wal_bytes)],
             ["可复用空闲页",bytes(stats.freelist_bytes)],
             ["扫描暂存",bytes(stats.stage_bytes)],
@@ -115,6 +123,7 @@ export function PhotoDatabaseMaintenance({onUpdated,mode="manage"}:{
           {stats.policy.missing_days} 天才能清理。自动保留至少最近 {stats.policy.retain_run_count} 条扫描历史，
           以及最近 {stats.policy.retain_run_days} 天的记录。
           回收操作仅针对索引数据库，不访问或删除原始照片。
+          物理空间释放需要另行执行 VACUUM。备份仅用于回退，会单独占用磁盘，不会被自动清理。
         </p>
         <div className="flex flex-wrap gap-2">
           {stats.migration_required?<button type="button" className="button-primary"

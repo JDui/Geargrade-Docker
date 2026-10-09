@@ -12,8 +12,8 @@ export default function DataToolsPage() {
         </p>
       </div>
 
-      <DataToolsSection />
       <PhotoDatabaseMaintenance mode="manage" />
+      <DataToolsSection />
     </div>
   );
 }

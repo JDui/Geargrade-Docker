@@ -81,6 +81,7 @@ export type PhotoMaintenanceJob = {
 export type PhotoMaintenanceStatus = {
   schema_version:number;target_schema_version:number;migration_required:boolean;
   db_bytes:number;wal_bytes:number;freelist_bytes:number;stage_bytes:number;
+  storage_bytes:number;backup_count:number;backup_bytes:number;
   physical_files:number;active_photos:number;missing_photos:number;
   eligible_for_purge:number;legacy_stage_rows:number;scan_runs:number;scan_active:boolean;
   policy:{missing_confirmations:number;missing_days:number;retain_run_count:number;retain_run_days:number};
