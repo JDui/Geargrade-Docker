@@ -1,4 +1,4 @@
-FROM node:22-alpine AS frontend-build
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-build
 
 WORKDIR /frontend
 
@@ -8,7 +8,7 @@ RUN npm install
 COPY frontend/ .
 RUN npm run build
 
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends libimage-exiftool-perl \
     && rm -rf /var/lib/apt/lists/*

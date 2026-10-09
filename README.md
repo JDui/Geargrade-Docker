@@ -1,10 +1,19 @@
 # Geargrade
 
-Geargrade 是一个面向个人摄影器材管理的自托管 Web 应用。它的重点不是通用库存，而是“设备档案 + 持有状态 + 主观评价 + 买卖记录 + 浏览筛选 + 榜单分析”。
+Geargrade 1.0.0 是面向个人摄影器材管理与拍摄数据分析的自托管 Web 应用。它围绕设备档案、持有状态、主观评价、买卖记录、筛选与榜单分析构建，并支持只读照片目录的 EXIF 索引和拍摄统计。
 
-当前版本已经支持主设备库、独立心愿池、数据导入导出、全量重置、本地与远程图片录入，以及围绕评分、持有时长和理财结果的可视化展示。
+当前版本支持主设备库、独立心愿池、GGPack 数据导入导出、全量重置、本地与远程图片录入，以及围绕评分、持有时长、理财结果和拍摄数据的可视化展示。
 
-## 累计更新（v0.7）
+## 当前版本（v1.0.0）
+
+- 新增拍摄数据模块：手动扫描只读照片目录，使用独立 SQLite 索引解析 RAW、JPEG、HEIF 等照片的 EXIF 元数据。
+- 新增拍摄数据动态筛选、分析图表、相机与镜头使用量榜，以及扫描进度与增量索引。
+- 修正照片索引、筛选和多来源扫描的回归问题，并完善图表动画、减少动态效果偏好和键盘操作。
+- 支持构建 `linux/amd64` 离线 Docker 镜像 tar 包，部署说明见下方；本次产物记录见 [更新记录](docs/UPDATE_LOG.md)。
+
+详细功能边界、部署只读挂载要求和回归检查见[拍摄数据设计文档](docs/photo-data/README.md)与[1.0.0 回归检查](docs/photo-data/REVIEW_1_0_0.md)。
+
+## 历史更新（v0.7）
 
 本次 v0.7 重点补齐 CList 脑图视图与交互细节，变化如下：
 
@@ -132,23 +141,17 @@ deploy/
 └─ .env
 ```
 
-如果你使用 GitHub Releases 里的离线镜像包，先下载对应文件到本地，再导入镜像。
+如果你使用本次构建的 AMD64 离线镜像包，先下载或复制 `dist/geargrade-v1.0.0-linux-amd64.tar` 到部署目录，再导入镜像。
 
 说明：
 
 - `dist/` 目录仅用于本地打包与临时存放产物，不再提交到仓库
-- 离线镜像包请从 Releases 页面获取，而不是从仓库文件树获取
+- Releases 提供的离线镜像包请从 Releases 页面获取；本次本地构建产物位于 `dist/`
 
 然后导入镜像：
 
 ```bash
-docker load -i geargrade-v0.4-linux-amd64.tar
-```
-
-ARM 设备改为：
-
-```bash
-docker load -i geargrade-v0.4-linux-arm64.tar
+docker load -i geargrade-v1.0.0-linux-amd64.tar
 ```
 
 然后使用以下 Compose 模板：
@@ -156,7 +159,7 @@ docker load -i geargrade-v0.4-linux-arm64.tar
 ```yaml
 services:
   geargrade:
-    image: geargrade:v0.4-amd64
+    image: geargrade-docker-app:1.0.0
     container_name: geargrade-app
     restart: unless-stopped
     ports:
@@ -172,7 +175,7 @@ volumes:
   geargrade_media:
 ```
 
-ARM 镜像标签改为 `geargrade:v0.4-arm64`。
+当前归档包含 `linux/amd64` 镜像，Compose 镜像标签为 `geargrade-docker-app:1.0.0`。
 
 ## 环境变量
 
