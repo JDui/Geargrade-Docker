@@ -3,7 +3,12 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
 from pathlib import Path
+
+
+SCHEMA_VERSION = 2
+MAINTENANCE_LOCK = threading.Lock()
 
 
 def database_path() -> Path:
@@ -22,6 +27,12 @@ def initialize() -> None:
     path = database_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with connect() as db:
+        preexisting = db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='photos'"
+        ).fetchone() is not None
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        if version > SCHEMA_VERSION:
+            raise RuntimeError("photo_index.db 使用了更新的数据库版本；请更新 Geargrade")
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript("""
         CREATE TABLE IF NOT EXISTS sources (
@@ -61,10 +72,6 @@ def initialize() -> None:
         CREATE INDEX IF NOT EXISTS photo_lens_date ON photos(lens_norm,shot_at);
         CREATE INDEX IF NOT EXISTS photo_capture_key ON photos(capture_key);
         CREATE INDEX IF NOT EXISTS photo_format ON photos(format_family);
-        CREATE TABLE IF NOT EXISTS scan_seen (
-          run_id TEXT NOT NULL, source_id TEXT NOT NULL, relpath TEXT NOT NULL,
-          payload TEXT NOT NULL, PRIMARY KEY(run_id,source_id,relpath)
-        );
         CREATE TABLE IF NOT EXISTS filter_presets (
           id TEXT PRIMARY KEY, name TEXT NOT NULL,
           filter_json TEXT NOT NULL, columns_json TEXT NOT NULL,
@@ -75,8 +82,20 @@ def initialize() -> None:
             "UPDATE scan_runs SET status='interrupted', ended_at=datetime('now'), "
             "error='Server stopped during scan' WHERE status IN ('queued','running')"
         )
-        db.execute("DELETE FROM scan_seen WHERE run_id IN "
-                   "(SELECT id FROM scan_runs WHERE status='interrupted')")
+        if preexisting and version < SCHEMA_VERSION:
+            # Leave legacy databases untouched until the user approves migration.
+            db.execute("""CREATE TABLE IF NOT EXISTS scan_seen (
+              run_id TEXT NOT NULL, source_id TEXT NOT NULL, relpath TEXT NOT NULL,
+              payload TEXT NOT NULL, PRIMARY KEY(run_id,source_id,relpath)
+            )""")
+            db.execute("DELETE FROM scan_seen WHERE run_id IN "
+                       "(SELECT id FROM scan_runs WHERE status='interrupted')")
+        if not preexisting:
+            db.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+        if not preexisting or version >= SCHEMA_VERSION:
+            columns = {r[1] for r in db.execute("PRAGMA table_info(photos)")}
+            if "missing_scans" not in columns:
+                db.execute("ALTER TABLE photos ADD COLUMN missing_scans INTEGER NOT NULL DEFAULT 0")
 
         # Small additive migrations for existing installations; no source IO.
         scan_columns = {r[1] for r in db.execute("PRAGMA table_info(scan_runs)")}
@@ -94,3 +113,16 @@ def initialize() -> None:
             if column not in scan_columns:
                 db.execute(f"ALTER TABLE scan_runs ADD COLUMN {column} {definition}")
         db.commit()
+    # A stage DB belongs to a run, never to the permanent photo index.
+    # Reap only jobs that are no longer active after crash-recovery above.
+    with connect() as db:
+        active = {r[0] for r in db.execute(
+            "SELECT id FROM scan_runs WHERE status IN ('queued','running')")}
+    for staged in path.parent.glob(path.stem + ".scan-stage-*.sqlite"):
+        run_id = staged.name[len(path.stem + ".scan-stage-"):-len(".sqlite")]
+        if run_id not in active:
+            for suffix in ("", "-journal", "-wal", "-shm"):
+                try:
+                    staged.with_name(staged.name + suffix).unlink(missing_ok=True)
+                except OSError:
+                    pass
