@@ -38,7 +38,7 @@ const empty = ():PhotoAnalytics => ({
   },
   exposure:{
     iso:[{bucket:5,label:"1600–3199",count:5,min:1600,max:3200,field:"exposure.iso"}],
-    focal:[],aperture:[],shutter:[],ev:[],
+    focal:[],focal_coverage:[],aperture:[],shutter:[],ev:[],
     flash:[],wb:[],focus:[],drive:[],shutter_type:[],picture_style:[],
     iso_shutter:[{x:1,y:2,count:4}],
     focal_aperture:[{x:2,y:1,count:5}]
@@ -145,4 +145,58 @@ describe("PhotoAnalyticsDashboard",()=>{
     fireEvent.click(bar!);
     expect(onApplyRules).toHaveBeenCalledWith([{field:"capture.year",op:"eq",value:"2025"}]);
   });
+
+  it("shows inclusive year range controls and progressively narrows the calendars",async()=>{
+    const input=empty();
+    input.timeline.yearly=[{key:"2023",count:2},{key:"2024",count:1},{key:"2025",count:5}];
+    input.timeline.daily=[
+      {date:"2023-01-05",count:2},{date:"2024-02-29",count:1},
+      {date:"2025-03-17",count:4},{date:"2025-03-18",count:1}
+    ];
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={vi.fn()}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"拍摄时间"}));
+    expect(screen.getByRole("slider",{name:"起始年份"})).toHaveValue("2023");
+    expect(screen.getByRole("slider",{name:"结束年份"})).toHaveValue("2025");
+    expect(screen.getByRole("button",{name:"2023-01-05拍摄2次"})).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"2024-02-29拍摄1次"})).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"2025-03-17拍摄4次"})).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider",{name:"起始年份"}),{target:{value:"2024"}});
+    expect(screen.queryByRole("button",{name:"2023-01-05拍摄2次"})).not.toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"2024-02-29拍摄1次"})).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"2025-03-17拍摄4次"})).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider",{name:"结束年份"}),{target:{value:"2024"}});
+    expect(screen.getByText("2024 年",{selector:"h4"})).toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"2025-03-17拍摄4次"})).not.toBeInTheDocument();
+  });
+
+  it("displays a rich hover preview for filmed and empty days and hides on leave",async()=>{
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={vi.fn()}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"拍摄时间"}));
+    const active=screen.getByRole("button",{name:"2025-03-17拍摄4次"});
+    fireEvent.mouseEnter(active);
+    const tooltip=screen.getByRole("tooltip");
+    expect(tooltip).toHaveTextContent("2025-03-17");
+    expect(tooltip).toHaveTextContent("周一");
+    expect(tooltip).toHaveTextContent("4");
+    expect(tooltip).toHaveTextContent("80.0%");
+    fireEvent.mouseLeave(active);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    const emptyDay=screen.getByRole("button",{name:"2025-03-19拍摄0次"});
+    fireEvent.focus(emptyDay);
+    expect(screen.getByRole("tooltip")).toHaveTextContent("当日没有索引拍摄记录");
+    fireEvent.blur(emptyDay);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("disables year range sliders on a single-year archive",async()=>{
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={vi.fn()}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"拍摄时间"}));
+    expect(screen.getByRole("slider",{name:"起始年份"})).toBeDisabled();
+    expect(screen.getByRole("slider",{name:"结束年份"})).toBeDisabled();
+  });
+
 });
