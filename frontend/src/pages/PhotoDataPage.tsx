@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { PhotoAnalyticsDashboard } from "../components/photo-data/PhotoAnalyticsDashboard";
 import { PhotoMetadataExplorer } from "../components/photo-data/PhotoMetadataExplorer";
@@ -204,7 +205,12 @@ export default function PhotoDataPage() {
       }
     };
     document.addEventListener("keydown",onKey);
-    return ()=>document.removeEventListener("keydown",onKey);
+    const oldOverflow=document.body.style.overflow;
+    document.body.style.overflow="hidden";
+    return ()=>{
+      document.removeEventListener("keydown",onKey);
+      document.body.style.overflow=oldOverflow;
+    };
   },[filtersOpen]);
   function changeWorkspace(next:"charts"|"files"){
     setQueryParams(current=>{
@@ -478,13 +484,13 @@ export default function PhotoDataPage() {
       </div>
     </section>
 
-    {filtersOpen?<div className="fixed inset-0 z-[80]">
+    {filtersOpen?createPortal(<div className="photo-modal-layer fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-5">
       <button type="button" aria-label="关闭筛选遮罩"
-        className="absolute inset-0 w-full h-full bg-black/60 cursor-default"
+        className="photo-modal-backdrop absolute inset-0 w-full h-full cursor-default"
         onClick={()=>setFiltersOpen(false)}/>
-      <aside id="photo-global-filters" ref={filterDrawerRef} role="dialog" aria-modal="true" aria-label="照片全局筛选"
-        className="absolute inset-y-0 right-0 w-full sm:w-[min(94vw,760px)] bg-panel border-l border-line shadow-2xl overflow-y-auto">
-        <header className="sticky top-0 z-10 p-4 sm:p-5 bg-panel border-b border-line flex items-center justify-between gap-3">
+      <section id="photo-global-filters" ref={filterDrawerRef} role="dialog" aria-modal="true" aria-label="照片全局筛选"
+        className="photo-filter-modal relative z-10 flex w-full min-h-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
+        <header className="shrink-0 p-4 sm:px-6 sm:py-5 bg-panel border-b border-line flex items-center justify-between gap-3">
           <div>
             <div className="dashboard-kicker">Global Filter Tool</div>
             <h2 className="text-xl font-semibold text-textPrimary mt-1">全局筛选</h2>
@@ -492,11 +498,11 @@ export default function PhotoDataPage() {
           </div>
           <button type="button" className="button-secondary" onClick={()=>setFiltersOpen(false)}>完成 / 关闭</button>
         </header>
-        <div className="p-4 sm:p-5 space-y-4">
+        <div className="photo-modal-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="dashboard-kicker">Metadata Filter</div>
-          <h2 className="mt-1 text-xl font-semibold text-textPrimary">筛选条件</h2>
+          <div className="dashboard-kicker">Filter Workspace</div>
+          
           <div className="mt-1 text-xs text-textSecondary">同列多选 OR · 多列 AND · 高级嵌套条件</div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -511,8 +517,8 @@ export default function PhotoDataPage() {
         </div>
       </div>
       {mode==="columns"?<div key="columns" className="photo-view-enter space-y-3">
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {columns.map(col=><div key={col.id} className="photo-view-enter shrink-0 w-56 rounded-xl border border-line bg-panelAlt/60 p-3 space-y-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {columns.map(col=><div key={col.id} className="photo-view-enter min-w-0 rounded-xl border border-line bg-panelAlt/60 p-3 space-y-2">
             <div className="flex items-center gap-1">
               <select className="input min-w-0 flex-1" aria-label="列字段" value={col.field}
                 onChange={e=>{setColumns(items=>items.map(item=>item.id===col.id?{...item,field:e.target.value,selected:[]}:item));setPage(0);}}>
@@ -521,7 +527,7 @@ export default function PhotoDataPage() {
               <button type="button" aria-label="移除筛选列" className="button-secondary px-2"
                 disabled={columns.length===1} onClick={()=>{setColumns(items=>items.filter(x=>x.id!==col.id));setPage(0);}}>×</button>
             </div>
-            <div className="max-h-52 overflow-y-auto space-y-1">
+            <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
               {(facets[col.id]?.field===col.field?facets[col.id].options:[]).map(item=>{
                 const key=item.value==null?"__MISSING__":String(item.value);
                 return <label className="flex gap-2 items-center text-xs cursor-pointer" key={key}>
@@ -536,7 +542,7 @@ export default function PhotoDataPage() {
               {!(facets[col.id]?.field===col.field&&facets[col.id].options.length)?<p className="text-xs text-textSecondary">当前无选项</p>:null}
             </div>
           </div>)}
-          {columns.length<8?<button className="button-secondary shrink-0 self-start" type="button"
+          {columns.length<8?<button className="button-secondary self-start min-h-[56px] w-full border-dashed" type="button"
             onClick={()=>setColumns(items=>[...items,{id:Math.max(...items.map(x=>x.id))+1,
               field:fields.find(f=>!items.some(x=>x.field===f.field_id))?.field_id||"exposure.iso",selected:[]}])}>
             + 添加列
@@ -551,7 +557,7 @@ export default function PhotoDataPage() {
         <button className="button-secondary" type="button" onClick={()=>{setColumns(initialColumns);setAdvanced(emptyGroup());setPage(0);}}>
           清除全部条件
         </button>
-        <span className="text-xs text-textSecondary">符合条件 {formatCount(results?.total_captures)} 次拍摄 / {formatCount(results?.total_files)} 个文件</span>
+        <span className="text-xs text-textSecondary">符合条件 {formatCount(summary?.logical_captures)} 次拍摄 / {formatCount(summary?.physical_files)} 个文件</span>
       </div>
       {presets.length?<div className="flex flex-wrap gap-2 border-t border-line pt-3">
         <span className="text-xs text-textSecondary self-center">已存预设：</span>
@@ -563,8 +569,8 @@ export default function PhotoDataPage() {
       </div>:null}
     
         </div>
-      </aside>
-    </div>:null}
+      </section>
+    </div>,document.body):null}
 
     {workspace==="charts"?
       <PhotoAnalyticsDashboard filter={filter} refresh={refresh} onApplyRules={applyChartFilter}/>:
