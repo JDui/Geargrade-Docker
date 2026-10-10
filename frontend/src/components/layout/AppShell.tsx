@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { PageTransition, isDrawerRoute, pageKey } from "./PageTransition";
 import { useAppSettings } from "./AppSettingsProvider";
@@ -16,18 +16,22 @@ function navClassName({ isActive }: { isActive: boolean }) {
 function SummaryBadge({
   label,
   value,
-  accentClass
+  accentClass,
+  to
 }: {
   label: string;
   value: number | string;
   accentClass: string;
+  to?: string;
 }) {
-  return (
-    <div className={`rounded-xl border border-line/80 px-2 py-1.5 sm:rounded-2xl sm:px-3 sm:py-2 ${accentClass}`}>
+  const className = `rounded-xl border border-line/80 px-2 py-1.5 sm:rounded-2xl sm:px-3 sm:py-2 ${accentClass}`;
+  const content = <>
       <div className="text-[10px] uppercase tracking-[0.16em] text-textSecondary sm:text-[11px]">{label}</div>
       <div className="mt-0.5 text-sm font-semibold text-textPrimary sm:mt-1 sm:text-lg">{value}</div>
-    </div>
-  );
+  </>;
+  return to ? <Link to={to} aria-label={`查看${label}设备：${value}`}
+    className={`${className} transition hover:border-accent/60 hover:bg-warning/12 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent`}>{content}</Link>
+    : <div className={className}>{content}</div>;
 }
 
 export function AppShell() {
@@ -75,7 +79,7 @@ export function AppShell() {
           <div className="grid grid-cols-3 gap-2 motion-enter motion-delay-1">
             <SummaryBadge label="当前持有" value={summary?.currently_owned_count ?? "--"} accentClass="bg-accent/6" />
             <SummaryBadge label="已售设备" value={summary?.sold_count ?? "--"} accentClass="bg-success/6" />
-            <SummaryBadge label="正在感受" value={summary?.feeling_in_progress_count ?? "--"} accentClass="bg-warning/8" />
+            <SummaryBadge label="正在感受" value={summary?.feeling_in_progress_count ?? "--"} accentClass="bg-warning/8" to="/archive?feeling_only=true" />
           </div>
 
           <nav className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-line bg-panelAlt/70 p-1 motion-enter motion-delay-2 sm:gap-2">

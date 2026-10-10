@@ -256,6 +256,67 @@ def test_analytics_all_views_and_physical_vs_capture(photo_env, monkeypatch):
     assert "GPS" not in str(details)
 
 
+def test_numeric_distributions_preserve_values_merge_drift_and_filter_counts(photo_env):
+    from app.photo_data.analytics import analyze
+
+    sid = service.add_source({"name": "Value distributions", "root_path": str(photo_env)})["id"]
+    samples = [
+        ("a", "raw", 100, 2.799999, 0.00400004, 24, -0.333333),
+        ("a", "jpeg", 100, 2.799999, 0.00400004, 24, -0.333333),
+        ("b", "raw", 125, 2.8, 0.004, 24.5, -0.33),
+        ("c", "raw", 160, 2.828427, 0.004, 35, 0.4999),
+        ("d", "raw", 200, 3.200000049, 0.005, 50, 0.5),
+        ("e", "raw", 200, 3.5, 0.00500004, 85, 0.666667),
+        ("f", "raw", 6400, 2.4, 0.1, 200, 0.67),
+        ("g", "raw", None, None, None, None, None),
+        ("h", "raw", 0, 0, 0, 0, 0),
+    ]
+    with db.connect() as connection:
+        for key, family, iso, aperture, shutter, focal, ev in samples:
+            filename = key + (".arw" if family == "raw" else ".jpg")
+            connection.execute("""
+                INSERT INTO photos (source_id,relpath,filename,ext,format_family,size_bytes,
+                    mtime_ns,capture_key,camera_norm,camera_model,iso,aperture,shutter,focal_mm,
+                    exposure_comp,parse_status,updated_at)
+                VALUES (?,?,?,?,?,1,1,?,?,'ILCE-7M4',?,?,?,?,?,'ok','2026-10-10')
+            """, (sid, filename, filename, Path(filename).suffix, family,
+                  key, "sony:ilce-7m4", iso, aperture, shutter, focal, ev))
+    result = analyze()
+    distributions = result["exposure"]["distributions"]
+    assert result["overview"]["captures"] == 8
+    assert result["overview"]["files"] == 9
+    assert [point["value"] for point in distributions["iso"]] == [100, 125, 160, 200, 6400]
+    assert [point["count"] for point in distributions["iso"]] == [1, 1, 1, 2, 1]
+    assert [point["value"] for point in distributions["focal"]] == [24, 24.5, 35, 50, 85, 200]
+    assert [point["value"] for point in distributions["aperture"]] == [2.4, 2.8, 3.2, 3.5]
+    merged = next(point for point in distributions["aperture"] if point["value"] == 2.8)
+    assert merged["count"] == 3
+    assert merged["min"] == 2.799999 and merged["max"] == 2.828427
+    assert [point["count"] for point in distributions["shutter"]] == [3, 2, 1]
+    assert [point["value"] for point in distributions["ev"]] == [-1 / 3, 0, 0.5, 2 / 3]
+    assert [point["count"] for point in distributions["ev"]] == [2, 1, 2, 2]
+    for name, points in distributions.items():
+        for point in points:
+            rules = ([{"field": point["field"], "op": "eq", "value": point["min"]}]
+                     if point["min"] == point["max"] else [
+                         {"field": point["field"], "op": "gte", "value": point["min"]},
+                         {"field": point["field"], "op": "lte", "value": point["max"]},
+                     ])
+            filtered = service.query({"version": "photo-filter.v1", "group": {"op": "and", "children": rules}})
+            assert filtered["total_captures"] == point["count"], (name, point)
+    selected = analyze({"version": "photo-filter.v1", "group": {"field": "exposure.iso", "op": "eq", "value": 200}})
+    assert [point["value"] for point in selected["exposure"]["distributions"]["iso"]] == [200]
+
+
+def test_aperture_stops_absorb_apex_rounding_but_keep_intermediate_apertures():
+    from app.photo_data.analytics import APERTURE_STOPS, _near_stop
+
+    assert _near_stop(2 ** 3.5, APERTURE_STOPS, 0.03) == 11
+    assert _near_stop(2 ** 4.5, APERTURE_STOPS, 0.03) == 22
+    assert _near_stop(3.10000001, APERTURE_STOPS, 0.03) == 3.10000001
+    assert _near_stop(2.4, APERTURE_STOPS, 0.03) == 2.4
+
+
 def test_analytics_filtered_consistently_and_no_source_access(photo_env, monkeypatch):
     from app.photo_data.analytics import analyze
 

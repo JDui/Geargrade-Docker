@@ -6,6 +6,7 @@ connection-local TEMP tables so a 100k+ library is not transferred to the UI.
 """
 from __future__ import annotations
 
+import math
 import sqlite3
 from typing import Any
 
@@ -23,9 +24,62 @@ EV_EDGES = (-3, -2, -1, -0.33, 0.33, 1, 2, 3)
 MP_EDGES = (2, 6, 12, 16, 20, 24, 32, 40, 50, 60, 80, 100)
 SIZE_EDGES = (1, 5, 10, 20, 40, 80, 150, 300, 600)
 
+APERTURE_STOPS = (1, 1.1, 1.2, 1.3, 1.4, 1.6, 1.8, 2, 2.2, 2.5, 2.8,
+                  3.2, 3.5, 4, 4.5, 5, 5.6, 6.3, 7.1, 8, 9, 10, 11, 13,
+                  14, 16, 18, 20, 22, 25, 29, 32, 36, 40, 45, 51, 57, 64)
+SHUTTER_STOPS = tuple(1 / denominator for denominator in (
+    8000, 6400, 5000, 4000, 3200, 2500, 2000, 1600, 1250, 1000,
+    800, 640, 500, 400, 320, 250, 200, 160, 125, 100, 80, 60, 50,
+    40, 30, 25, 20, 15, 13, 10, 8, 6, 5, 4, 3, 2.5, 2, 1.6, 1.3
+)) + (1, 1.3, 1.6, 2, 2.5, 3.2, 4, 5, 6, 8, 10, 13, 15, 20, 25, 30, 40, 50, 60)
+
 
 def grouped(db: sqlite3.Connection, sql: str, values: tuple = ()) -> list[dict]:
     return [dict(row) for row in db.execute(sql, values)]
+
+
+def _near_stop(value: float, stops: tuple[float, ...], tolerance: float = 0.015) -> float:
+    nearest = min(stops, key=lambda stop: abs(value - stop))
+    # Only absorb EXIF representation drift, preserving intermediate settings.
+    return nearest if abs(value - nearest) / nearest <= tolerance else value
+
+
+def _numeric_distribution(db: sqlite3.Connection, column: str, field: str,
+                          kind: str = "exact") -> list[dict]:
+    points: dict[float, dict] = {}
+    for row in grouped(db, f"SELECT {column} AS value,COUNT(*) AS count FROM captures "
+                           f"WHERE {column} IS NOT NULL GROUP BY {column} ORDER BY {column}"):
+        value = float(row["value"])
+        if not math.isfinite(value) or (kind != "ev" and value <= 0):
+            continue
+        normalized = value
+        if kind == "aperture":
+            normalized = _near_stop(value, APERTURE_STOPS, 0.03)
+        elif kind == "shutter":
+            normalized = _near_stop(value, SHUTTER_STOPS)
+        elif kind == "ev":
+            nearest = min((round(value * 3) / 3, round(value * 2) / 2),
+                          key=lambda stop: abs(value - stop))
+            if abs(value - nearest) <= 0.02:
+                normalized = nearest
+        if kind == "aperture":
+            label = f"F{normalized:g}"
+        elif kind == "shutter":
+            label = (f"1/{1 / normalized:g} s" if normalized < 1
+                     else f"{normalized:g} s")
+        elif kind == "ev":
+            label = "0 EV" if normalized == 0 else f"{normalized:+.2f}".rstrip("0").rstrip(".") + " EV"
+        else:
+            label = f"{normalized:.12g}"
+        point = points.setdefault(normalized, {
+            "value": normalized, "label": label, "count": 0,
+            "min": value, "max": value, "field": field,
+        })
+        point["count"] += row["count"]
+        # Filter with the observed bounds, including every merged source value.
+        point["min"] = min(point["min"], value)
+        point["max"] = max(point["max"], value)
+    return [points[value] for value in sorted(points)]
 
 
 def _buckets(db: sqlite3.Connection, column: str, edges: tuple[float, ...],
@@ -187,6 +241,13 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
                 "FROM captures GROUP BY camera,lens ORDER BY count DESC LIMIT 250"),
         }
         exposure = {
+            "distributions": {
+                "iso": _numeric_distribution(db, "iso", "exposure.iso"),
+                "focal": _numeric_distribution(db, "focal_eq_mm", "exposure.focal_eq_mm"),
+                "aperture": _numeric_distribution(db, "aperture", "exposure.aperture", "aperture"),
+                "shutter": _numeric_distribution(db, "shutter", "exposure.shutter", "shutter"),
+                "ev": _numeric_distribution(db, "exposure_comp", "exposure.compensation", "ev"),
+            },
             "iso": _buckets(db,"iso",ISO_EDGES,"exposure.iso"),
             "focal": _buckets(db,"focal_eq_mm",FOCAL_EDGES,"exposure.focal_eq_mm"),
             "focal_coverage": grouped(db,

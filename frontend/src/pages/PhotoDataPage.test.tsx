@@ -1,9 +1,10 @@
 import "@testing-library/jest-dom";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../api/photoData";
 import PhotoDataPage from "./PhotoDataPage";
+import DataToolsPage from "./DataToolsPage";
 
 vi.mock("../api/photoData", async importOriginal => {
   const actual = await importOriginal<typeof api>();
@@ -18,6 +19,7 @@ vi.mock("../components/photo-data/PhotoAnalyticsDashboard", () => ({
 vi.mock("../components/photo-data/PhotoDatabaseMaintenance", () => ({
   PhotoDatabaseMaintenance: () => <div>Database Maintenance</div>
 }));
+vi.mock("../components/tools/DataToolsSection", () => ({ DataToolsSection: () => <div>Device Tools</div> }));
 const fields: api.PhotoField[] = [
   ["capture.month", "月份", "enum"], ["camera.model_norm", "机身", "enum"],
   ["lens.model_norm", "镜头", "enum"], ["files.format_family", "格式", "enum"],
@@ -28,7 +30,10 @@ const run = (): api.PhotoScan => ({
   seen:100,extracted:25,unchanged:0,failed:0,removed:0,error:null,processed:25,total_candidates:100,
   directories_seen:2,phase:"enumerating",workers:3,active_workers:2,enumeration_done:0,rate_files_per_sec:5
 });
-function mount() { return render(<MemoryRouter><PhotoDataPage/></MemoryRouter>); }
+function mount(path="/photo-data") { return render(<MemoryRouter initialEntries={[path]}><Routes>
+  <Route path="/photo-data" element={<PhotoDataPage/>}/>
+  <Route path="/data-tools" element={<DataToolsPage/>}/>
+</Routes></MemoryRouter>); }
 async function ready() {
   fireEvent.click(await screen.findByRole("button",{name:/全局筛选/}));
   await waitFor(()=>expect(screen.getAllByLabelText("列字段")[0]).toHaveValue("capture.month"));
@@ -68,7 +73,7 @@ describe("PhotoDataPage regressions", () => {
     fireEvent.change(screen.getByLabelText("比较值"),{target:{value:"400,"}});
     expect(screen.getByLabelText("比较值")).toHaveValue("400,");
     fireEvent.change(screen.getByLabelText("比较值"),{target:{value:"400,3200"}});
-    await waitFor(()=>expect(lastFilter().group).toMatchObject({children:[{children:[{field:"exposure.iso",op:"in",value:[400,3200]}]}]}));
+    await waitFor(()=>expect(lastFilter().group).toMatchObject({children:[{field:"exposure.iso",op:"in",value:[400,3200]}]}));
   });
 
   it("creates a valid NOT child and removes it without leaving an empty NOT",async()=>{
@@ -105,22 +110,42 @@ describe("PhotoDataPage regressions", () => {
   it("shows a stopped scan without an indefinite animation",async()=>{
     vi.mocked(api.getPhotoStatus).mockResolvedValue({sources:[],recent_scans:[{...run(),status:"cancelled",phase:"cancelled"}],last_success:null});
     mount();await ready();
-    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuetext","扫描已停止，文件总量未确定");
-    expect(screen.getByRole("progressbar").firstElementChild).not.toHaveClass("photo-scan-indeterminate");
+    expect(screen.getByRole("progressbar",{hidden:true})).toHaveAttribute("aria-valuetext","扫描已停止，文件总量未确定");
+    expect(screen.getByRole("progressbar",{hidden:true}).firstElementChild).not.toHaveClass("photo-scan-indeterminate");
   });
 
-  it("starts in analytics and does not query file rows until opening the file workspace",async()=>{
-    mount();
-    await screen.findByRole("tab",{name:"统计分析"});
-    expect(screen.getByText("Analytics")).toBeInTheDocument();
-    expect(screen.queryByText("照片明细", {selector:"h2"})).not.toBeInTheDocument();
+  it("keeps photo files in data tools, folded and unqueried until opened",async()=>{
+    mount("/data-tools");
+    const toggle=screen.getByRole("button",{name:/照片明细.*展开/});
+    expect(toggle).toHaveAttribute("aria-expanded","false");
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     expect(api.getPhotoQuery).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("tab",{name:"照片明细"}));
-    expect(await screen.findByRole("heading",{name:"照片明细"})).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(await screen.findByRole("searchbox")).toBeInTheDocument();
     await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledOnce());
-    fireEvent.click(screen.getByRole("tab",{name:"统计分析"}));
-    expect(screen.getByText("Analytics")).toBeInTheDocument();
-    expect(screen.queryByRole("heading",{name:"照片明细"})).not.toBeInTheDocument();
+    expect(api.getPhotoStatus).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button",{name:"扫描更新"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:/照片明细.*收起/}));
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:/照片明细.*展开/}));
+    expect(api.getPhotoQuery).toHaveBeenCalledOnce();
+  });
+
+  it("does not display or request file rows on the analytics page",async()=>{
+    mount();await screen.findByText("Analytics");
+    expect(screen.queryByRole("tab",{name:"照片明细"})).not.toBeInTheDocument();
+    expect(api.getPhotoQuery).not.toHaveBeenCalled();
+    expect(screen.getByRole("link",{name:/查看照片明细/})).toHaveAttribute("href",expect.stringContaining("/data-tools?photo_files=1"));
+  });
+
+  it("redirects old file links and retains the camera filter",async()=>{
+    mount("/photo-data?view=files&camera=sony%3Ailce-7m4");
+    await screen.findByRole("heading",{name:"数据工具"});
+    await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledWith(
+      expect.objectContaining({group:expect.objectContaining({children:expect.arrayContaining([
+        expect.objectContaining({field:"camera.model_norm",op:"in",value:["sony:ilce-7m4"]})
+      ])})}),40,0));
+    expect(screen.getByRole("button",{name:/照片明细.*收起/})).toHaveAttribute("aria-expanded","true");
   });
 
   it("keeps global filter conditions across analytics and file workspaces",async()=>{
@@ -128,20 +153,17 @@ describe("PhotoDataPage regressions", () => {
     const column=screen.getAllByLabelText("列字段")[0].parentElement!.parentElement!;
     fireEvent.click(await within(column).findByRole("checkbox"));
     await waitFor(()=>expect(lastFilter().group).toMatchObject({children:[{field:"capture.month",op:"in",value:["sample"]}]}));
+    const transferred=lastFilter();
     fireEvent.click(screen.getByRole("button",{name:"完成 / 关闭"}));
-    fireEvent.click(screen.getByRole("tab",{name:"照片明细"}));
+    fireEvent.click(screen.getByRole("link",{name:/查看照片明细/}));
     await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledWith(
-      expect.objectContaining({group:expect.objectContaining({children:expect.arrayContaining([
-        expect.objectContaining({field:"capture.month",op:"in",value:["sample"]})
-      ])})}),40,0));
+      transferred,40,0));
     expect(screen.getByRole("button",{name:/全局筛选/})).toHaveTextContent("1 项");
-    fireEvent.click(screen.getByRole("tab",{name:"统计分析"}));
-    expect(screen.getByText("Analytics")).toBeInTheDocument();
+    expect(screen.getByRole("heading",{name:"数据工具"})).toBeInTheDocument();
   });
 
   it("applies file name search only to file queries and keeps global summary untouched",async()=>{
-    mount();
-    fireEvent.click(await screen.findByRole("tab",{name:"照片明细"}));
+    mount("/data-tools?photo_files=1");
     await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalled());
     const summaries=vi.mocked(api.getPhotoSummary).mock.calls.length;
     fireEvent.change(screen.getByRole("searchbox",{name:"文件名或相对路径搜索"}),{target:{value:"A7M4"}});
@@ -150,6 +172,19 @@ describe("PhotoDataPage regressions", () => {
         expect.objectContaining({field:"files.relpath",op:"contains",value:"A7M4"})
       ])})}),40,0));
     expect(vi.mocked(api.getPhotoSummary).mock.calls.length).toBe(summaries);
+  });
+
+  it("keeps deep transferred groups intact when adding a file search",async()=>{
+    let nested:api.PhotoRule={field:"exposure.iso",op:"gte",value:800};
+    for(let level=0;level<4;level++)nested={op:"not",children:[nested]};
+    const filter:api.PhotoFilter={version:"photo-filter.v1",group:{op:"and",children:[nested]}};
+    const params=new URLSearchParams({photo_files:"1",photo_filter:JSON.stringify(filter)});
+    mount("/data-tools?"+params.toString());
+    await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledWith(filter,40,0));
+    fireEvent.change(screen.getByRole("searchbox",{name:"文件名或相对路径搜索"}),{target:{value:"DSC"}});
+    await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledWith({version:"photo-filter.v1",group:{op:"and",children:[
+      nested,{field:"files.relpath",op:"contains",value:"DSC"}
+    ]}},40,0));
   });
 
   it("renders global filters as a centered body portal and restores scroll on Escape",async()=>{

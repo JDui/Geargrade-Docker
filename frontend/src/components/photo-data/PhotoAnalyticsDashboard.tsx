@@ -1,16 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from "react";
 import { createPortal } from "react-dom";
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart,
+  Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
 } from "recharts";
 import {
-  getPhotoAnalytics, type AnalyticsBucket, type AnalyticsCount,
+  getPhotoAnalytics, type AnalyticsBucket, type AnalyticsCount, type AnalyticsValue,
   type AnalyticsHeatCell, type AnalyticsPoint, type PhotoAnalytics,
   type PhotoFilter, type PhotoRule
 } from "../../api/photoData";
 
 import { useAppSettings } from "../layout/AppSettingsProvider";
+import { photoGearColor, photoGearLabel } from "../../utils/photoData";
 
 const ChartMotion = createContext(false);
 function useChartMotion() {
@@ -52,44 +53,84 @@ function Trend({title,desc,items,field,choose}:{
   title:string;desc:string;items:AnalyticsPoint[];field:string;choose:(field:string,name:string)=>void;
 }) {
   const motion = useChartMotion();
-  const shown=items.slice(-100);
+  const monthly=field==="capture.month";
+  const [range,setRange]=useState("24");
+  const sorted=[...items].sort((a,b)=>a.key.localeCompare(b.key));
+  const shown=monthly&&range!=="all"?sorted.slice(-Number(range)):sorted;
   return <Panel title={title} desc={desc}>
+    {monthly?<div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+      <label className="flex items-center gap-2 text-xs text-textSecondary">显示范围
+        <select className="input py-1.5 text-xs" aria-label={title+"显示范围"} value={range} onChange={event=>setRange(event.target.value)}>
+          <option value="12">最近 12 个月</option><option value="24">最近 24 个月</option><option value="all">全部历史</option>
+        </select>
+      </label>
+      <span className="text-xs text-textSecondary">{shown[0]?.key} — {shown[shown.length-1]?.key}</span>
+    </div>:null}
     {shown.length?<div className="w-full h-60"><ResponsiveContainer width="100%" height="100%">
-      <BarChart data={shown} margin={{top:5,right:12,bottom:5,left:-20}}>
-        <CartesianGrid strokeDasharray="3 3" opacity={0.14}/>
-        <XAxis dataKey="key" tick={{fontSize:10}} minTickGap={20}/>
-        <YAxis allowDecimals={false} tick={{fontSize:10}}/>
+      <BarChart data={shown} margin={{top:20,right:12,bottom:5,left:-12}}>
+        <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.14}/>
+        <XAxis dataKey="key" tick={{fontSize:11}} minTickGap={20}/>
+        <YAxis allowDecimals={false} tick={{fontSize:11}} tickFormatter={value=>count(Number(value))}/>
         <Tooltip formatter={value=>[count(Number(value)),"拍摄次数"]}/>
-        <Bar {...motion} dataKey="count" fill={colors[0]} maxBarSize={34} cursor="pointer"
-          onClick={e=>{const item=(e as {payload?:AnalyticsPoint}).payload;if(item)choose(field,item.key);}}/>
+        <Bar {...motion} dataKey="count" fill={colors[0]} radius={[4,4,0,0]} maxBarSize={38} cursor="pointer"
+          onClick={e=>{const item=(e as {payload?:AnalyticsPoint}).payload;if(item)choose(field,item.key);}}>
+          {shown.length<=24?<LabelList dataKey="count" position="top" fontSize={10} formatter={(value:number)=>count(value)}/>:null}
+        </Bar>
       </BarChart>
     </ResponsiveContainer></div>:<NoData/>}
-    <p className="mt-1 text-[11px] text-textSecondary">{hint}，最多展示最近 100 个周期</p>
+    {shown.length?<details className="mt-3">
+      <summary className="text-xs text-accent cursor-pointer">查看数值 / 按时间筛选</summary>
+      <div className="mt-2 flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+        {shown.map(item=><button type="button" key={item.key} className="button-secondary text-xs"
+          onClick={()=>choose(field,item.key)}>{item.key} · {count(item.count)} 次</button>)}
+      </div>
+    </details>:null}
   </Panel>;
 }
-function Ranking({title,desc,items,onChoose,max=12}:{
+function Ranking({title,desc,items,onChoose,max=12,order="count",total,colorForName,wide=false}:{
   title:string;desc:string;items:AnalyticsCount[];onChoose?:(name:string)=>void;max?:number;
+  order?:"count"|"input";total?:number;
+  colorForName?:(name:string)=>string;
+  wide?:boolean;
 }) {
-  const motion = useChartMotion();
-  const shown=items.slice(0,max);
-  return <Panel title={title} desc={desc}>
-    {shown.length?<div style={{height:Math.max(210,shown.length*29+40)}}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart layout="vertical" data={shown.map(v=>({...v,short:short(v.name,20)}))}
-          margin={{top:0,right:18,bottom:2,left:0}}>
-          <XAxis type="number" tick={{fontSize:10}} allowDecimals={false}/>
-          <YAxis type="category" dataKey="short" tick={{fontSize:10}} width={112}/>
-          <Tooltip formatter={v=>[count(Number(v)),"次"]}
-            labelFormatter={(_,p)=>String((p[0]?.payload as AnalyticsCount|undefined)?.name||"")}/>
-          <Bar {...motion} dataKey="count" fill={colors[0]} radius={[0,3,3,0]}
-            cursor={onChoose?"pointer":"default"} onClick={e=>{
-              const item=(e as {payload?:AnalyticsCount}).payload;
-              if(item?.name)onChoose?.(item.name);
-            }}/>
-        </BarChart>
-      </ResponsiveContainer>
+  const ordered=order==="count"?[...items].sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name)):items;
+  const shown=ordered.filter(item=>item.name!=="未记录").slice(0,max);
+  const unknown=items.find(item=>item.name==="未记录");
+  const peak=Math.max(1,...shown.map(item=>item.count));
+  const label=(name:string)=>name.split(" + ").map(photoGearLabel).join(" + ");
+  const row=(item:AnalyticsCount,index:number)=> <>
+    <div className="flex items-start justify-between gap-3">
+      <span className="min-w-0 text-sm text-textPrimary break-words">
+        {order==="count"&&item.name!=="未记录"?<span className="mr-2 text-xs text-textSecondary tabular-nums">{index+1}.</span>:null}
+        {label(item.name)}
+      </span>
+      <span className="shrink-0 text-right tabular-nums">
+        <span className="text-sm font-semibold text-textPrimary">{count(item.count)} <span className="font-normal text-xs text-textSecondary">次</span></span>
+        {total!==undefined?<span className="ml-2 text-xs text-textSecondary">{ratio(item.count,total)}</span>:null}
+      </span>
+    </div>
+    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line/50" aria-hidden="true">
+      <div className="h-full rounded-full bg-accent origin-left"
+        style={{width:ratio(Math.min(item.count,peak),peak),backgroundColor:colorForName?.(item.name)}}/>
+    </div>
+  </>;
+  return <Panel title={title} desc={desc} wide={wide}>
+    {shown.length||unknown?<div>
+      <ol className="space-y-1">
+        {shown.map((item,index)=><li key={item.name}>
+          {onChoose?<button type="button" className="w-full rounded-xl p-2.5 text-left hover:bg-panelAlt/70 transition"
+            aria-label={"筛选 "+label(item.name)+"："+count(item.count)+" 次"} onClick={()=>onChoose(item.name)}>
+            {row(item,index)}
+          </button>:<div className="p-2.5">{row(item,index)}</div>}
+        </li>)}
+      </ol>
+      {unknown?<div className="mt-3 border-t border-line pt-3">
+        {onChoose?<button type="button" className="w-full rounded-xl p-2.5 text-left hover:bg-panelAlt/70"
+          aria-label={"筛选未记录："+count(unknown.count)+" 次"} onClick={()=>onChoose(unknown.name)}>{row(unknown,0)}</button>
+          :<div className="p-2.5">{row(unknown,0)}</div>}
+      </div>:null}
     </div>:<NoData/>}
-    {onChoose&&<p className="mt-1 text-[11px] text-textSecondary">{hint}</p>}
+    {onChoose&&<p className="mt-3 text-[11px] text-textSecondary">点击条目可筛选{total!==undefined?" · 占比按当前全部拍摄计算":""}</p>}
   </Panel>;
 }
 function Buckets({title,desc,items,onChoose}:{
@@ -108,6 +149,66 @@ function Buckets({title,desc,items,onChoose}:{
       </BarChart>
     </ResponsiveContainer></div>:<NoData/>}
     {onChoose&&<p className="mt-1 text-[11px] text-textSecondary">{hint}（按数值区间）</p>}
+  </Panel>;
+}
+function NumericDistribution({title,desc,items,total,line=false,logarithmic=false,unit="",choose}:{
+  title:string;desc:string;items:AnalyticsValue[];total:number;line?:boolean;logarithmic?:boolean;
+  unit?:string;choose:(rules:PhotoRule[])=>void;
+}) {
+  const motion=useChartMotion();
+  const [valuesOpen,setValuesOpen]=useState(false);
+  const points=useMemo(()=>[...items].sort((a,b)=>a.value-b.value),[items]);
+  const known=points.reduce((sum,point)=>sum+point.count,0);
+  const singleValue=points[0]?.value??1;
+  const domain:[number|"dataMin",number|"dataMax"]=points.length===1
+    ? logarithmic?[singleValue/2,singleValue*2]:[Math.max(0,singleValue-1),singleValue+1]
+    : ["dataMin","dataMax"];
+  const label=(point:AnalyticsValue)=>point.label+(unit?" "+unit:"");
+  function select(point:AnalyticsValue){
+    choose(point.min===point.max?[{field:point.field,op:"eq",value:point.min}]:[
+      {field:point.field,op:"gte",value:point.min},{field:point.field,op:"lte",value:point.max}
+    ]);
+  }
+  const tooltip=<Tooltip formatter={value=>[count(Number(value)),"拍摄次数"]}
+    labelFormatter={(_value,payload)=>payload[0]?.payload?label(payload[0].payload as AnalyticsValue):String(_value)}/>;
+  return <Panel title={title} desc={desc}>
+    <p className="mb-3 text-xs text-textSecondary tabular-nums">有效记录 {count(known)} 次 · 缺失或无效 {count(Math.max(0,total-known))} 次</p>
+    {points.length?<>
+      <div className="h-64" role="img" aria-label={title+"，"+points.length+" 个参数值，"+count(known)+" 次有效拍摄"}>
+        <ResponsiveContainer width="100%" height="100%">
+          {line?<LineChart data={points} margin={{top:18,right:18,bottom:20,left:0}}
+            onClick={state=>{const point=state?.activePayload?.[0]?.payload as AnalyticsValue|undefined;if(point)select(point);}}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.14}/>
+            <XAxis dataKey="value" type="number" scale={logarithmic?"log":"linear"}
+              domain={domain}
+              ticks={points.map(point=>point.value)} interval="preserveStartEnd" minTickGap={18} tick={{fontSize:11}}
+              tickFormatter={value=>Number(value).toLocaleString("zh-CN",{maximumFractionDigits:3})}
+              label={{value:unit?"数值（"+unit+"）":"ISO",position:"insideBottom",offset:-12,fontSize:11}}/>
+            <YAxis allowDecimals={false} tick={{fontSize:11}} tickFormatter={value=>count(Number(value))} width={60}/>
+            {tooltip}
+            <Line {...motion} isAnimationActive={motion.isAnimationActive&&points.length<=500} type="linear" dataKey="count"
+              stroke={colors[0]} strokeWidth={2} dot={points.length<=80?{r:3}:false} activeDot={{r:5}}/>
+          </LineChart>:<BarChart data={points} margin={{top:22,right:12,bottom:12,left:0}}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.14}/>
+            <XAxis dataKey="label" tick={{fontSize:11}} minTickGap={18}/>
+            <YAxis allowDecimals={false} tick={{fontSize:11}} tickFormatter={value=>count(Number(value))} width={60}/>
+            {tooltip}
+            <Bar {...motion} dataKey="count" fill={colors[2]} maxBarSize={38} radius={[3,3,0,0]} cursor="pointer"
+              onClick={event=>{const point=(event as {payload?:AnalyticsValue}).payload;if(point)select(point);}}>
+              {points.length<=16?<LabelList dataKey="count" position="top" fontSize={10} formatter={(value:number)=>count(value)}/>:null}
+            </Bar>
+          </BarChart>}
+        </ResponsiveContainer>
+      </div>
+      <button type="button" className="mt-3 text-xs text-accent hover:underline" aria-expanded={valuesOpen}
+        onClick={()=>setValuesOpen(open=>!open)}>{valuesOpen?"收起读数":"查看全部 "+points.length+" 个参数值 / 筛选"}</button>
+      {valuesOpen?<div className="mt-3 flex flex-wrap gap-2 max-h-52 overflow-y-auto">
+        {points.map(point=><button type="button" key={point.value} className="button-secondary text-xs tabular-nums"
+          aria-label={"筛选 "+label(point)+"："+count(point.count)+" 次"} onClick={()=>select(point)}>
+          {label(point)} · {count(point.count)} 次 · {ratio(point.count,known)}
+        </button>)}
+      </div>:null}
+    </>:<NoData/>}
   </Panel>;
 }
 function Donut({title,desc,items,onChoose}:{
@@ -137,17 +238,17 @@ function Donut({title,desc,items,onChoose}:{
     </div>:<NoData/>}
   </Panel>;
 }
-function Heat({title,desc,xs,ys,data,onChoose}:{
+function Heat({title,desc,xs,ys,data,onChoose,wideLabels=false}:{
   title:string;desc:string;xs:string[];ys:string[];data:AnalyticsHeatCell[];
-  onChoose?:(x:number,y:number)=>void;
+  onChoose?:(x:number,y:number)=>void;wideLabels?:boolean;
 }) {
   const values=new Map(data.map(v=>[v.x+","+v.y,v.count]));
   const peak=Math.max(1,...data.map(v=>v.count));
-  return <Panel title={title} desc={desc} wide={xs.length>12}>
+  return <Panel title={title} desc={desc} wide={xs.length>12||wideLabels}>
     {xs.length&&ys.length?<div className="overflow-x-auto pb-2">
       <div className="w-max">
         <div className="flex gap-1 ml-[112px] mb-2">
-          {xs.map((x,i)=><span key={i} className="w-9 text-center text-[10px] text-textSecondary" title={x}>{short(x,5)}</span>)}
+          {xs.map((x,i)=><span key={i} className={"text-center text-[10px] text-textSecondary "+(wideLabels?"w-28":"w-9")} title={x}>{short(x,wideLabels?14:5)}</span>)}
         </div>
         {ys.map((label,y)=><div key={label} className="flex gap-1 items-center mb-1">
           <span className="w-[108px] shrink-0 text-right truncate pr-2 text-[10px] text-textSecondary" title={label}>
@@ -158,7 +259,7 @@ function Heat({title,desc,xs,ys,data,onChoose}:{
             const opacity=n?.15+Math.sqrt(n/peak)*.8:.045;
             return <button key={i} type="button" disabled={!n||!onChoose}
               aria-label={label+" × "+x+"："+n+"次"} title={label+" × "+x+"："+count(n)+"次"}
-              className="w-9 h-8 rounded text-[10px] text-textPrimary enabled:hover:ring-1 enabled:hover:ring-accent"
+              className={"h-8 rounded text-[10px] text-textPrimary enabled:hover:ring-1 enabled:hover:ring-accent "+(wideLabels?"w-28":"w-9")}
               style={{backgroundColor:"rgb(var(--color-accent) / "+opacity+")",color:opacity>=.55?"var(--photo-chart-strong-ink)":"rgb(var(--color-text-primary))"}} onClick={()=>onChoose?.(i,y)}>
               {n?count(n):"·"}
             </button>;
@@ -332,25 +433,31 @@ function CameraByYear({data,cameras,onChoose}:{
     top.forEach((name,i)=>row["series"+i]=data.find(x=>x.year===year&&x.camera===name)?.count||0);
     return row;
   });
-  return <Panel title="年度机身更替" desc="最多六款常用机身的年度拍摄次数堆叠面积图" wide>
-    {series.length&&top.length?<div className="h-72">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={series} margin={{top:6,right:12,bottom:0,left:-15}}>
-          <CartesianGrid strokeDasharray="3 3" opacity={0.15}/>
-          <XAxis dataKey="year" tick={{fontSize:11}}/>
-          <YAxis allowDecimals={false} tick={{fontSize:10}}/>
-          <Tooltip formatter={v=>[count(Number(v)),"拍摄次数"]}/><Legend/>
-          {top.map((name,i)=><Area {...motion} key={name} dataKey={"series"+i}
-            name={short(name,22)} stackId="1" type="monotone"
-            stroke={colors[i%colors.length]} fill={colors[i%colors.length]} fillOpacity={0.65}/>)}
-        </AreaChart>
-      </ResponsiveContainer>
-      <div className="flex flex-wrap gap-2 mt-2">{top.map(name=><button key={name}
-        className="text-xs text-accent hover:underline" type="button"
-        onClick={()=>onChoose(name)}>{short(name,25)}</button>)}</div>
-    </div>:<NoData/>}
+  const color=photoGearColor;
+  return <Panel title="年度机身更替" desc="前六款常用机身的年度拍摄次数；每年一列，颜色对应同一机身" wide>
+    {series.length&&top.length?<>
+      <div className="h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={series} margin={{top:6,right:12,bottom:0,left:-12}}>
+            <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.15}/>
+            <XAxis dataKey="year" tick={{fontSize:11}}/>
+            <YAxis allowDecimals={false} tick={{fontSize:11}}/>
+            <Tooltip formatter={(value,name)=>[count(Number(value))+" 次",name]}/>
+            {top.map((name,i)=><Bar {...motion} key={name} dataKey={"series"+i}
+              name={photoGearLabel(name)} stackId="gear" fill={color(name)} maxBarSize={48}/>)}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex flex-wrap gap-2 mt-4">{top.map(name=><button key={name}
+        className="inline-flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs text-textPrimary hover:border-accent"
+        type="button" onClick={()=>onChoose(name)}>
+        <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor:color(name)}} aria-hidden="true"/>
+        {photoGearLabel(name)}
+      </button>)}</div>
+    </>:<NoData/>}
   </Panel>;
 }
+
 function Coverage({records,filterMissing}:{
   records:PhotoAnalytics["quality"];filterMissing:(name:string)=>void;
 }) {
@@ -441,9 +548,9 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
           </div>
         </Panel>
         <Trend title="年度拍摄趋势" desc="点击年度进行交叉筛选" items={d.timeline.yearly} field="capture.year" choose={choose}/>
-        <Trend title="月度拍摄趋势" desc="最多展示最近 100 个月的拍摄数据" items={d.timeline.monthly} field="capture.month" choose={choose}/>
+        <Trend title="月度拍摄趋势" desc="按时间排列，可切换最近 12 / 24 个月或全部历史" items={d.timeline.monthly} field="capture.month" choose={choose}/>
         <Ranking title="常用机身 Top 8" desc="逻辑拍摄数，未识别信息单独列出"
-          items={d.gear.cameras} max={8} onChoose={name=>choose("camera.model_norm",name)}/>
+          items={d.gear.cameras} total={d.overview.captures} colorForName={photoGearColor} max={8} onChoose={name=>choose("camera.model_norm",name)}/>
         <Donut title="物理文件格式" desc="RAW 与 JPEG 双份分别计入文件数量"
           items={d.files.formats} onChoose={name=>choose("files.format_family",name)}/>
       </>}
@@ -451,10 +558,10 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
         <Calendar daily={d.timeline.daily} choose={choose}/>
         <Trend title="每年拍摄量" desc="按拍摄日期分组" items={d.timeline.yearly} field="capture.year" choose={choose}/>
         <Trend title="每月拍摄量" desc="按相机记录的当地日期分组" items={d.timeline.monthly} field="capture.month" choose={choose}/>
-        <Ranking title="每天拍摄时段" desc="各小时逻辑拍摄次数" max={24}
+        <Ranking order="input" title="每天拍摄时段" desc="各小时逻辑拍摄次数" max={24}
           items={d.timeline.hours.map(x=>({name:String(x.hour).padStart(2,"0")+"时",count:x.count}))}
           onChoose={name=>choose("capture.hour",name.slice(0,2))}/>
-        <Ranking title="星期使用分布" desc="周一至周日"
+        <Ranking order="input" title="星期使用分布" desc="周一至周日"
           items={weekdays.map((name,i)=>({name,count:d.timeline.weekdays.find(v=>v.weekday===i)?.count||0}))}
           onChoose={name=>onApplyRules([{field:"capture.weekday",op:"eq",value:weekdays.indexOf(name)}])}/>
         <Heat title="星期 × 小时热力图" desc="星期为行，24 小时为列；点击任意格子筛选"
@@ -466,33 +573,46 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
           ])}/>
       </>}
       {tab==="gear"&&<>
-        <CameraByYear data={d.gear.camera_years} cameras={d.gear.cameras}
-          onChoose={name=>choose("camera.model_norm",name)}/>
         <Ranking title="机身使用次数 Top 16" desc="每次 RAW+JPEG 只算一次" items={d.gear.cameras}
-          max={16} onChoose={name=>choose("camera.model_norm",name)}/>
+          max={16} total={d.overview.captures} colorForName={photoGearColor} onChoose={name=>choose("camera.model_norm",name)}/>
         <Ranking title="镜头使用次数 Top 16" desc="部分厂商镜头信息依赖 MakerNotes" items={d.gear.lenses}
-          max={16} onChoose={name=>choose("lens.model_norm",name)}/>
-        <Donut title="相机品牌占比" desc="依据 EXIF 品牌，未记录会单独标出"
-          items={d.gear.makers} onChoose={name=>choose("camera.make",name)}/>
-        <Ranking title="最常用机身 + 镜头组合" desc="点击组合同时筛选机身和镜头"
-          items={d.gear.combos.slice(0,12).map(x=>({name:x.camera+" + "+x.lens,count:x.count}))}
+          max={16} total={d.overview.captures} colorForName={photoGearColor} onChoose={name=>choose("lens.model_norm",name)}/>
+        <Ranking wide title="最常用机身 + 镜头组合" desc="点击组合同时筛选机身和镜头"
+          total={d.overview.captures} items={d.gear.combos.map(x=>({name:x.camera+" + "+x.lens,count:x.count}))}
           onChoose={name=>{
             const found=d.gear.combos.find(x=>x.camera+" + "+x.lens===name);
             if(found)onApplyRules([...fieldRules("camera.model_norm",found.camera),
               ...fieldRules("lens.model_norm",found.lens)]);
           }}/>
+        <CameraByYear data={d.gear.camera_years} cameras={d.gear.cameras}
+          onChoose={name=>choose("camera.model_norm",name)}/>
+        <Donut title="相机品牌占比" desc="依据 EXIF 品牌，未记录会单独标出"
+          items={d.gear.makers} onChoose={name=>choose("camera.make",name)}/>
         <GearMatrix cameras={d.gear.cameras} lenses={d.gear.lenses} data={d.gear.lens_by_camera}
           onChoose={(cam,lens)=>onApplyRules([...fieldRules("camera.model_norm",cam),...fieldRules("lens.model_norm",lens)])}/>
       </>}
       {tab==="exposure"&&<>
-        <Buckets title="ISO 感光度分布" desc="按区间聚合的感光度直方图" items={d.exposure.iso} onChoose={bin}/>
+        {d.exposure.distributions?<>
+          <NumericDistribution line logarithmic title="ISO 感光度分布" desc="每个实际 ISO 值一个点，不合并区间；横轴按倍数间距排列"
+            items={d.exposure.distributions.iso} total={d.overview.captures} choose={onApplyRules}/>
+          <NumericDistribution line title="35mm 等效焦距分布" desc="每个等效焦距值一个点，不合并焦段；未知画幅不参与统计" unit="mm"
+            items={d.exposure.distributions.focal} total={d.overview.captures} choose={onApplyRules}/>
+          <NumericDistribution title="光圈分布" desc="按实际光圈档位排列；距标准档位 3% 内的表示偏差合并，其他值保留"
+            items={d.exposure.distributions.aperture} total={d.overview.captures} choose={onApplyRules}/>
+          <NumericDistribution title="快门速度分布" desc="按曝光时间排列；距标准快门档位 1.5% 内的表示偏差合并，其他值保留"
+            items={d.exposure.distributions.shutter} total={d.overview.captures} choose={onApplyRules}/>
+          <NumericDistribution title="曝光补偿分布" desc="距 1/3 或 1/2 EV 档位 0.02 EV 内的偏差合并；其他值保留，缺失不计入 0"
+            items={d.exposure.distributions.ev} total={d.overview.captures} choose={onApplyRules}/>
+        </>:<>
+          <Buckets title="ISO 感光度分布" desc="当前服务返回旧版区间统计；升级服务后可查看逐值折线图" items={d.exposure.iso} onChoose={bin}/>
+          <Buckets title="35mm 等效焦距分布" desc="当前服务返回旧版区间统计；升级服务后可查看逐值折线图" items={d.exposure.focal} onChoose={bin}/>
+          <Buckets title="光圈分布" desc="当前服务返回旧版区间统计" items={d.exposure.aperture} onChoose={bin}/>
+          <Buckets title="快门速度分布" desc="当前服务返回旧版区间统计" items={d.exposure.shutter} onChoose={bin}/>
+          <Buckets title="曝光补偿分布" desc="当前服务返回旧版区间统计" items={d.exposure.ev} onChoose={bin}/>
+        </>}
         <Donut title="等效焦距识别来源" desc="EXIF 原生等效焦距、机身画幅推算或未知；未知不会按 1× 处理"
           items={(d.exposure.focal_coverage??[]).map(v=>({...v,name:
             v.name==="EXIF"?"EXIF 等效焦距":v.name==="camera_profile"?"机身画幅换算":"画幅未知 / 无等效数据"}))}/>
-        <Buckets title="35mm 等效焦距分布" desc="优先使用 EXIF 等效焦距；缺失时只按已识别机身画幅换算，未知画幅不混入分布" items={d.exposure.focal} onChoose={bin}/>
-        <Buckets title="光圈分布" desc="F 值区间频率" items={d.exposure.aperture} onChoose={bin}/>
-        <Buckets title="快门速度分布" desc="短曝光至长曝光，按照秒数区间" items={d.exposure.shutter} onChoose={bin}/>
-        <Buckets title="曝光补偿分布" desc="正负 EV 值，未知不计入 0" items={d.exposure.ev} onChoose={bin}/>
         <Donut title="闪光灯使用记录" desc="依赖可读的闪光元数据"
           items={d.exposure.flash} onChoose={name=>choose("exposure.flash",name)}/>
         <Heat title="ISO × 快门热力图" desc="交叉分析光线强度、快门速度和感光度"
@@ -565,6 +685,6 @@ function GearMatrix({cameras,lenses,data,onChoose}:{
     const x=cols.indexOf(entry.camera), y=rows.indexOf(entry.lens);
     if(x>=0&&y>=0)cells.push({x,y,count:entry.count});
   }
-  return <Heat title="机身 × 镜头使用矩阵" desc="前八款机身和镜头组成的真实拍摄次数矩阵"
-    xs={cols} ys={rows} data={cells} onChoose={(x,y)=>onChoose(cols[x],rows[y])}/>;
+  return <Heat wideLabels title="机身 × 镜头使用矩阵" desc="前八款机身和镜头组成的真实拍摄次数矩阵"
+    xs={cols.map(photoGearLabel)} ys={rows.map(photoGearLabel)} data={cells} onChoose={(x,y)=>onChoose(cols[x],rows[y])}/>;
 }

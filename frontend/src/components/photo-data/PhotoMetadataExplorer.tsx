@@ -51,9 +51,9 @@ export function PhotoMetadataExplorer({results,loading,page,pageSize,onPageChang
     ["拍摄时间",show(item.shot_at)],["相机型号",show(item.camera_model)],
     ["机身归一化型号",show(item.camera_norm)],["镜头",show(item.lens_model)],
     ["镜头归一化型号",show(item.lens_norm)],["ISO",show(item.iso)],
-    ["光圈",item.aperture!=null?"F"+item.aperture:"—"],
+    ["光圈",item.aperture!=null?"F"+Number(item.aperture.toFixed(2)):"—"],
     ["快门",item.shutter!=null?item.shutter+" s":"—"],
-    ["焦距",item.focal_mm!=null?item.focal_mm+" mm":"—"],
+    ["焦距",item.focal_mm!=null?Number(item.focal_mm.toFixed(1))+" mm":"—"],
     ["分辨率",item.width_px&&item.height_px?item.width_px+" × "+item.height_px+" px":"—"],
     ["解析状态",item.parse_status]
   ];
@@ -102,8 +102,8 @@ export function PhotoMetadataExplorer({results,loading,page,pageSize,onPageChang
           <td className="px-4 py-3 max-w-48 truncate" title={item.lens_model||""}>{item.lens_model||"—"}</td>
           <td className="px-4 py-3 uppercase">{item.format_family}</td>
           <td className="px-4 py-3">{item.iso??"—"}</td>
-          <td className="px-4 py-3">{item.aperture!=null?"F"+item.aperture:"—"}</td>
-          <td className="px-4 py-3">{item.focal_mm!=null?item.focal_mm+" mm":"—"}</td>
+          <td className="px-4 py-3">{item.aperture!=null?"F"+Number(item.aperture.toFixed(2)):"—"}</td>
+          <td className="px-4 py-3">{item.focal_mm!=null?Number(item.focal_mm.toFixed(1))+" mm":"—"}</td>
           <td className="px-4 py-3 whitespace-nowrap">{(item.size_bytes/1048576).toFixed(1)} MiB</td>
         </tr>)}</tbody>
       </table>

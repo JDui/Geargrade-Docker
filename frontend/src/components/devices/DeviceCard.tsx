@@ -29,12 +29,14 @@ function ratingClass(rating: NonNullable<DeviceListItem["rating_label"]>) {
 interface DeviceCardProps {
   device: DeviceListItem;
   detailBasePath?: string;
+  detailSearch?: string;
   editBasePath?: string;
 }
 
 export function DeviceCard({
   device,
   detailBasePath = "/devices",
+  detailSearch = "",
   editBasePath = "/devices"
 }: DeviceCardProps) {
   const navigate = useNavigate();
@@ -47,7 +49,7 @@ export function DeviceCard({
       <button
         type="button"
         className="flex flex-1 flex-col p-4 text-left transition hover:bg-panelAlt/20 active:scale-[0.995]"
-        onClick={() => navigate(`${detailBasePath}/${device.id}`)}
+        onClick={() => navigate(`${detailBasePath}/${device.id}${detailSearch}`)}
       >
         <div className="flex gap-4">
           {device.image_url ? (

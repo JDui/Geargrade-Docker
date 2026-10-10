@@ -32,6 +32,7 @@ const path = "/api/v1/photo-data";
 export type AnalyticsCount = { name: string; count: number };
 export type AnalyticsPoint = { key: string; count: number };
 export type AnalyticsBucket = { label: string; bucket: number; count: number; min: number | null; max: number | null; field: string };
+export type AnalyticsValue = { value: number; label: string; count: number; min: number; max: number; field: string };
 export type AnalyticsHeatCell = { x: number; y: number; count: number };
 export type PhotoAnalytics = {
   schema_version: string;
@@ -56,6 +57,7 @@ export type PhotoAnalytics = {
     lens_by_camera: { camera: string; lens: string; count: number }[];
   };
   exposure: {
+    distributions?: { iso: AnalyticsValue[]; focal: AnalyticsValue[]; aperture: AnalyticsValue[]; shutter: AnalyticsValue[]; ev: AnalyticsValue[] };
     iso: AnalyticsBucket[]; focal: AnalyticsBucket[]; focal_coverage: AnalyticsCount[]; aperture: AnalyticsBucket[];
     shutter: AnalyticsBucket[]; ev: AnalyticsBucket[];
     flash: AnalyticsCount[]; wb: AnalyticsCount[]; focus: AnalyticsCount[];

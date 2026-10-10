@@ -1,14 +1,15 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { useMatch } from "react-router-dom";
+import { useMatch, useSearchParams } from "react-router-dom";
 
-import { fetchDevices } from "../api/devices";
+import { buildDeviceQuery, fetchDevices } from "../api/devices";
 import { CategoryDrawerList } from "../components/devices/CategoryDrawerList";
 import { DeviceCard } from "../components/devices/DeviceCard";
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
 import { DeviceTable } from "../components/devices/DeviceTable";
 import { DeviceFiltersBar } from "../components/filters/DeviceFiltersBar";
 import { useDashboardSummary } from "../components/layout/DashboardSummaryProvider";
-import { DEFAULT_FILTERS, type DeviceFilters, type DeviceListItem, type ViewMode } from "../types/device";
+import { type DeviceFilters, type DeviceListItem, type ViewMode } from "../types/device";
+import { readDeviceFilters } from "../utils/deviceFilters";
 
 export default function ArchivePage() {
   const tableSortFields = new Set(["name", "category", "status", "score", "purchase_price", "purchase_date", "sale_date"]);
@@ -17,7 +18,16 @@ export default function ArchivePage() {
   const { summary, refreshSummary } = useDashboardSummary();
   const [devices, setDevices] = useState<DeviceListItem[]>([]);
   const [total, setTotal] = useState(0);
-  const [filters, setFilters] = useState<DeviceFilters>(DEFAULT_FILTERS);
+  const [params, setParams] = useSearchParams();
+  const filters = useMemo(() => readDeviceFilters(params), [params]);
+  const detailSearch = params.size ? "?" + params.toString() : "";
+
+  function setFilters(next: DeviceFilters | ((current: DeviceFilters) => DeviceFilters)) {
+    const updated = typeof next === "function" ? next(filters) : next;
+    const query = new URLSearchParams(buildDeviceQuery(updated));
+    if (updated.search) query.set("search", updated.search);
+    setParams(query, { replace: true });
+  }
   const [viewMode, setViewMode] = useState<ViewMode>("cards");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +118,7 @@ export default function ArchivePage() {
       <section className="flex items-center justify-between">
         <div>
           <div className="text-xs uppercase tracking-[0.22em] text-textSecondary">Archive Collection</div>
-          <h2 className="mt-1 text-2xl font-semibold text-textPrimary">共 {total} 条设备档案</h2>
+          <h2 className="mt-1 text-2xl font-semibold text-textPrimary">{filters.feelingOnly ? "正在感受 · " : "共 "}{total} 条设备档案</h2>
         </div>
       </section>
 
@@ -125,11 +135,11 @@ export default function ArchivePage() {
       {!loading && devices.length ? (
         viewMode === "cards" ? (
           noFiltersActive ? (
-            <CategoryDrawerList items={devices} detailBasePath="/archive/devices" />
+            <CategoryDrawerList items={devices} detailBasePath="/archive/devices" detailSearch={detailSearch} />
           ) : (
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {devices.map((device) => (
-                <DeviceCard key={device.id} device={device} detailBasePath="/archive/devices" />
+                <DeviceCard key={device.id} device={device} detailBasePath="/archive/devices" detailSearch={detailSearch} />
               ))}
             </section>
           )
@@ -140,6 +150,7 @@ export default function ArchivePage() {
             sortOrder={filters.sortOrder}
             onSortChange={handleTableSort}
             detailBasePath="/archive/devices"
+            detailSearch={detailSearch}
           />
         )
       ) : null}
@@ -147,7 +158,7 @@ export default function ArchivePage() {
       {drawerMatch?.params.deviceId ? (
         <DeviceDetailDrawer
           deviceId={drawerMatch.params.deviceId}
-          closeTo="/archive"
+          closeTo={"/archive" + detailSearch}
           onChanged={() => {
             loadDevices(effectiveFilters).catch(() => undefined);
             refreshSummary().catch(() => undefined);

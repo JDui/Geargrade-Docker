@@ -7,6 +7,7 @@ import { DeviceCard } from "./DeviceCard";
 interface CategoryDrawerListProps {
   items: DeviceListItem[];
   detailBasePath?: string;
+  detailSearch?: string;
   editBasePath?: string;
 }
 
@@ -19,6 +20,7 @@ interface CategoryGroup {
 export function CategoryDrawerList({
   items,
   detailBasePath = "/devices",
+  detailSearch = "",
   editBasePath = "/devices"
 }: CategoryDrawerListProps) {
   const [openCategories, setOpenCategories] = useState<Set<DeviceCategory>>(new Set());
@@ -111,6 +113,7 @@ export function CategoryDrawerList({
                       key={device.id}
                       device={device}
                       detailBasePath={detailBasePath}
+                      detailSearch={detailSearch}
                       editBasePath={editBasePath}
                     />
                   ))}

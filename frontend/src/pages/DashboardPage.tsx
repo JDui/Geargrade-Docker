@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { useLocation, useMatch, useNavigate } from "react-router-dom";
+import { Link, useLocation, useMatch, useNavigate } from "react-router-dom";
 
 import { fetchDevices } from "../api/devices";
 import { AnnualPurchaseChart } from "../components/dashboard/AnnualPurchaseChart";
@@ -188,12 +188,13 @@ export default function DashboardPage() {
               <div className="dashboard-signal-label">已售设备</div>
               <div className="dashboard-signal-value dashboard-signal-value-compact">{summary?.sold_count ?? "--"}</div>
             </div>
-            <div className="dashboard-signal-card dashboard-signal-card-compact motion-enter motion-delay-3">
+            <Link to="/archive?feeling_only=true" aria-label="查看正在感受设备"
+              className="dashboard-signal-card dashboard-signal-card-compact motion-enter motion-delay-3 transition hover:border-accent/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
               <div className="dashboard-signal-label">正在感受</div>
               <div className="dashboard-signal-value dashboard-signal-value-compact">
                 {summary?.feeling_in_progress_count ?? "--"}
               </div>
-            </div>
+            </Link>
           </div>
         </div>
 

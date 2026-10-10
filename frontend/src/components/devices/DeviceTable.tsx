@@ -17,6 +17,7 @@ interface DeviceTableProps {
   sortOrder: SortOrder;
   onSortChange: (sortBy: SortBy) => void;
   detailBasePath?: string;
+  detailSearch?: string;
   editBasePath?: string;
 }
 
@@ -36,6 +37,7 @@ export function DeviceTable({
   sortOrder,
   onSortChange,
   detailBasePath = "/devices",
+  detailSearch = "",
   editBasePath = "/devices"
 }: DeviceTableProps) {
   const navigate = useNavigate();
@@ -73,7 +75,7 @@ export function DeviceTable({
                 <tr
                   key={device.id}
                   className="cursor-pointer hover:bg-panelAlt/40"
-                  onClick={() => navigate(`${detailBasePath}/${device.id}`)}
+                  onClick={() => navigate(`${detailBasePath}/${device.id}${detailSearch}`)}
                 >
                   <td className="px-4 py-4">
                     <div className="font-medium text-textPrimary">{formatDeviceTitle(device)}</div>

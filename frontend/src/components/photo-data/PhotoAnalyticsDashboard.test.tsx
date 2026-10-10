@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getPhotoAnalytics, type PhotoAnalytics, type PhotoFilter } from "../../api/photoData";
+import { getPhotoAnalytics, type AnalyticsValue, type PhotoAnalytics, type PhotoFilter } from "../../api/photoData";
 import { PhotoAnalyticsDashboard } from "./PhotoAnalyticsDashboard";
 import { useAppSettings } from "../layout/AppSettingsProvider";
 
@@ -96,6 +96,76 @@ describe("PhotoAnalyticsDashboard",()=>{
       {field:"exposure.shutter",op:"gte",value:0.01},
       {field:"exposure.shutter",op:"lt",value:0.1}
     ]);
+  });
+  it("renders exact ISO and focal line distributions and filters merged stops with observed bounds",async()=>{
+    const input=empty();
+    const point=(value:number,count:number,field:string,label=String(value),min=value,max=value):AnalyticsValue=>({value,count,field,label,min,max});
+    input.exposure.distributions={
+      iso:[point(160,2,"exposure.iso"),point(100,1,"exposure.iso"),point(125,2,"exposure.iso")],
+      focal:[point(35,2,"exposure.focal_eq_mm"),point(24,1,"exposure.focal_eq_mm"),point(24.5,2,"exposure.focal_eq_mm")],
+      aperture:[point(2.8,3,"exposure.aperture","F2.8",2.799999,2.828427),point(3.2,2,"exposure.aperture","F3.2",3.200000049,3.200000049)],
+      shutter:[],ev:[]
+    };
+    vi.mocked(useAppSettings).mockReturnValue({reduceMotion:true} as ReturnType<typeof useAppSettings>);
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    const onApplyRules=vi.fn();
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"曝光与焦距"}));
+    const iso=screen.getByRole("heading",{name:"ISO 感光度分布"}).closest("section")!;
+    const focal=screen.getByRole("heading",{name:"35mm 等效焦距分布"}).closest("section")!;
+    expect(iso.querySelector(".recharts-line-curve")).not.toBeNull();
+    expect(focal.querySelector(".recharts-line-curve")).not.toBeNull();
+    expect(iso.querySelector(".recharts-bar")).toBeNull();
+    fireEvent.click(within(iso).getByRole("button",{name:/查看全部 3/}));
+    expect(within(iso).getAllByRole("button",{name:/筛选 /}).map(button=>button.getAttribute("aria-label")))
+      .toEqual(["筛选 100：1 次","筛选 125：2 次","筛选 160：2 次"]);
+    fireEvent.click(within(iso).getByRole("button",{name:"筛选 125：2 次"}));
+    expect(onApplyRules).toHaveBeenLastCalledWith([{field:"exposure.iso",op:"eq",value:125}]);
+    fireEvent.click(within(focal).getByRole("button",{name:/查看全部 3/}));
+    fireEvent.click(within(focal).getByRole("button",{name:"筛选 24.5 mm：2 次"}));
+    expect(onApplyRules).toHaveBeenLastCalledWith([{field:"exposure.focal_eq_mm",op:"eq",value:24.5}]);
+    const aperture=screen.getByRole("heading",{name:"光圈分布"}).closest("section")!;
+    fireEvent.click(within(aperture).getByRole("button",{name:/查看全部 2/}));
+    fireEvent.click(within(aperture).getByRole("button",{name:"筛选 F2.8：3 次"}));
+    expect(onApplyRules).toHaveBeenLastCalledWith([
+      {field:"exposure.aperture",op:"gte",value:2.799999},
+      {field:"exposure.aperture",op:"lte",value:2.828427}
+    ]);
+    fireEvent.click(within(aperture).getByRole("button",{name:"筛选 F3.2：2 次"}));
+    expect(onApplyRules).toHaveBeenLastCalledWith([{field:"exposure.aperture",op:"eq",value:3.200000049}]);
+  });
+
+  it("shows empty numeric distributions without treating missing values as zero",async()=>{
+    const input=empty();
+    input.exposure.distributions={iso:[],focal:[],aperture:[],shutter:[],ev:[]};
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={vi.fn()}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"曝光与焦距"}));
+    const iso=screen.getByRole("heading",{name:"ISO 感光度分布"}).closest("section")!;
+    expect(within(iso).getByText("有效记录 0 次 · 缺失或无效 5 次")).toBeInTheDocument();
+    expect(within(iso).getByText("当前筛选条件下没有可用记录")).toBeInTheDocument();
+    expect(iso.querySelector(".recharts-line")).toBeNull();
+  });
+
+  it("renders finite line coordinates when a filter leaves a single parameter value",async()=>{
+    const input=empty();
+    const point=(value:number,field:string):AnalyticsValue=>({value,label:String(value),count:5,min:value,max:value,field});
+    input.exposure.distributions={iso:[point(80,"exposure.iso")],focal:[point(24.5,"exposure.focal_eq_mm")],aperture:[],shutter:[],ev:[]};
+    vi.mocked(useAppSettings).mockReturnValue({reduceMotion:true} as ReturnType<typeof useAppSettings>);
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={vi.fn()}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"曝光与焦距"}));
+    for(const name of ["ISO 感光度分布","35mm 等效焦距分布"]){
+      const panel=screen.getByRole("heading",{name}).closest("section")!;
+      const dot=panel.querySelector("circle.recharts-line-dot")!;
+      expect(dot).not.toBeNull();
+      expect(Number.isFinite(Number(dot.getAttribute("cx")))).toBe(true);
+      expect(Number.isFinite(Number(dot.getAttribute("cy")))).toBe(true);
+      expect(within(panel).getByRole("button",{name:/查看全部 1/})).toBeInTheDocument();
+    }
   });
   it("calendar dates can be used as a single exact date filter",async()=>{
     const onApplyRules=vi.fn();
@@ -197,6 +267,42 @@ describe("PhotoAnalyticsDashboard",()=>{
     fireEvent.click(screen.getByRole("tab",{name:"拍摄时间"}));
     expect(screen.getByRole("slider",{name:"起始年份"})).toBeDisabled();
     expect(screen.getByRole("slider",{name:"结束年份"})).toBeDisabled();
+  });
+
+  it("shows readable gear names and counts while filtering by canonical keys",async()=>{
+    const onApplyRules=vi.fn();
+    const input=empty();
+    input.gear.cameras=[{name:"未记录",count:7},{name:"sony:zv-1",count:1},{name:"sony:ilce-7m4",count:5}];
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    const panel=screen.getByText("常用机身 Top 8").closest("section")!;
+    const buttons=within(panel).getAllByRole("button");
+    expect(buttons[0]).toHaveAccessibleName("筛选 Sony ILCE-7M4：5 次");
+    expect(buttons[1]).toHaveAccessibleName("筛选 Sony ZV-1：1 次");
+    expect(buttons[2]).toHaveAccessibleName("筛选未记录：7 次");
+    fireEvent.click(buttons[0]);
+    expect(onApplyRules).toHaveBeenLastCalledWith([{field:"camera.model_norm",op:"eq",value:"sony:ilce-7m4"}]);
+    fireEvent.click(buttons[2]);
+    expect(onApplyRules).toHaveBeenLastCalledWith([{field:"camera.model_norm",op:"is_missing"}]);
+  });
+
+  it("defaults to recent months and provides all history in time order",async()=>{
+    const input=empty();
+    input.timeline.monthly=Array.from({length:36},(_,i)=>({key:`${2023+Math.floor(i/12)}-${String(i%12+1).padStart(2,"0")}`,count:i+1})).reverse();
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    const onApplyRules=vi.fn();
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    const panel=screen.getByText("月度拍摄趋势").closest("section")!;
+    expect(within(panel).getByRole("combobox")).toHaveValue("24");
+    expect(within(panel).queryByRole("button",{name:"2023-01 · 1 次",hidden:true})).not.toBeInTheDocument();
+    fireEvent.change(within(panel).getByRole("combobox"),{target:{value:"all"}});
+    const options=within(panel).getAllByRole("button",{hidden:true});
+    expect(options[0]).toHaveTextContent("2023-01 · 1 次");
+    expect(options[options.length-1]).toHaveTextContent("2025-12 · 36 次");
+    fireEvent.click(options[0]);
+    expect(onApplyRules).toHaveBeenLastCalledWith([{field:"capture.month",op:"eq",value:"2023-01"}]);
   });
 
 });

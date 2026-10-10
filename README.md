@@ -1,14 +1,15 @@
 # Geargrade
 
-Geargrade 1.0.0 是面向个人摄影器材管理与拍摄数据分析的自托管 Web 应用。它围绕设备档案、持有状态、主观评价、买卖记录、筛选与榜单分析构建，并支持只读照片目录的 EXIF 索引和拍摄统计。
+Geargrade 1.0.1 是面向个人摄影器材管理与拍摄数据分析的自托管 Web 应用。它围绕设备档案、持有状态、主观评价、买卖记录、筛选与榜单分析构建，并支持只读照片目录的 EXIF 索引和拍摄统计。
 
 当前版本支持主设备库、独立心愿池、GGPack 数据导入导出、全量重置、本地与远程图片录入，以及围绕评分、持有时长、理财结果和拍摄数据的可视化展示。
 
-## 当前版本（v1.0.0）
+## 当前版本（v1.0.1）
 
 - 新增拍摄数据模块：手动扫描只读照片目录，使用独立 SQLite 索引解析 RAW、JPEG、HEIF 等照片的 EXIF 元数据。
 - 新增拍摄数据动态筛选、分析图表、相机与镜头使用量榜，以及扫描进度与增量索引。
 - 修正照片索引、筛选和多来源扫描的回归问题，并完善图表动画、减少动态效果偏好和键盘操作。
+- 照片明细移至数据工具并默认折叠；器材排行与年度图优化读数和排序；顶栏与概览「正在感受」可进入筛选档案。
 - 支持构建 `linux/amd64` 离线 Docker 镜像 tar 包，部署说明见下方；本次产物记录见 [更新记录](docs/UPDATE_LOG.md)。
 
 详细功能边界、部署只读挂载要求和回归检查见[拍摄数据设计文档](docs/photo-data/README.md)与[1.0.0 回归检查](docs/photo-data/REVIEW_1_0_0.md)。
@@ -101,7 +102,7 @@ CList 页面位于独立 `/clist` 路由，按购入年份组织设备时间树�
 
 ### 数据工具
 
-数据工具位于独立 `/data-tools` 页面，用于通过 GGPack 表格包导入导出主设备库与心愿池，以及执行高危数据重置。
+数据工具位于独立 `/data-tools` 页面，集中管理默认折叠的照片明细、照片索引数据库维护、GGPack 主设备库与心愿池导入导出，以及数据重置。
 
 ![数据工具](docs/screenshots/data-tools.png)
 
@@ -141,7 +142,7 @@ deploy/
 └─ .env
 ```
 
-如果你使用本次构建的 AMD64 离线镜像包，先下载或复制 `dist/geargrade-v1.0.0-linux-amd64.tar` 到部署目录，再导入镜像。
+如果你使用本次构建的 AMD64 离线镜像包，先下载或复制 `dist/geargrade-v1.0.1-linux-amd64.tar` 到部署目录，再导入镜像。
 
 说明：
 
@@ -151,7 +152,7 @@ deploy/
 然后导入镜像：
 
 ```bash
-docker load -i geargrade-v1.0.0-linux-amd64.tar
+docker load -i geargrade-v1.0.1-linux-amd64.tar
 ```
 
 然后使用以下 Compose 模板：
@@ -159,7 +160,7 @@ docker load -i geargrade-v1.0.0-linux-amd64.tar
 ```yaml
 services:
   geargrade:
-    image: geargrade-docker-app:1.0.0
+    image: geargrade-docker-app:1.0.1
     container_name: geargrade-app
     restart: unless-stopped
     ports:
@@ -175,7 +176,7 @@ volumes:
   geargrade_media:
 ```
 
-当前归档包含 `linux/amd64` 镜像，Compose 镜像标签为 `geargrade-docker-app:1.0.0`。
+当前归档包含 `linux/amd64` 镜像，Compose 镜像标签为 `geargrade-docker-app:1.0.1`。
 
 ## 环境变量
 
