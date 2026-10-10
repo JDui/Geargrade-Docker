@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode, type SyntheticEvent } from "react";
 import { createPortal } from "react-dom";
 import {
-  Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
 } from "recharts";
 import {
@@ -186,7 +186,7 @@ function NumericDistribution({title,desc,items,total,line=false,logarithmic=fals
               label={{value:unit?"数值（"+unit+"）":"ISO",position:"insideBottom",offset:-12,fontSize:11}}/>
             <YAxis allowDecimals={false} tick={{fontSize:11}} tickFormatter={value=>count(Number(value))} width={60}/>
             {tooltip}
-            <Line {...motion} isAnimationActive={motion.isAnimationActive&&points.length<=500} type="linear" dataKey="count"
+            <Line {...motion} isAnimationActive={motion.isAnimationActive&&points.length<=500} type="monotone" dataKey="count"
               stroke={colors[0]} strokeWidth={2} dot={points.length<=80?{r:3}:false} activeDot={{r:5}}/>
           </LineChart>:<BarChart data={points} margin={{top:22,right:12,bottom:12,left:0}}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.14}/>
@@ -421,39 +421,79 @@ function Calendar({daily,choose}:{
     </div>:<NoData/>}
   </Panel>;
 }
-function CameraByYear({data,cameras,onChoose}:{
-  data:PhotoAnalytics["gear"]["camera_years"];cameras:AnalyticsCount[];
+function GearByYear({data,kind,unavailable=false,onChoose}:{
+  data:{year:string;name:string;count:number}[];kind:"机身"|"镜头";unavailable?:boolean;
   onChoose:(name:string)=>void;
 }) {
   const motion = useChartMotion();
-  const top=cameras.filter(x=>x.name!=="未记录").slice(0,6).map(x=>x.name);
-  const years=[...new Set(data.map(d=>d.year))].sort();
+  const byYear=new Map<string,Map<string,number>>();
+  for(const point of data){
+    if(!/^\d{4}$/.test(point.year)||Number(point.year)<1000||!point.name.trim()
+      ||point.name==="未记录"||point.count<=0)continue;
+    const entries=byYear.get(point.year)??new Map<string,number>();
+    entries.set(point.name,(entries.get(point.name)??0)+point.count);
+    byYear.set(point.year,entries);
+  }
+  const annual=new Map([...byYear].map(([year,entries])=>[year,[...entries]
+    .map(([name,count])=>({name,count})).sort((a,b)=>b.count-a.count||(a.name<b.name?-1:a.name>b.name?1:0)).slice(0,10)]));
+  const totals=new Map<string,number>();
+  for(const entries of annual.values())for(const entry of entries)
+    totals.set(entry.name,(totals.get(entry.name)??0)+entry.count);
+  const names=[...totals.keys()].sort((a,b)=>totals.get(b)!-totals.get(a)!||(a<b?-1:a>b?1:0));
+  const recordedYears=[...annual.keys()].map(Number).sort((a,b)=>a-b);
+  const years=recordedYears.length?Array.from(
+    {length:recordedYears[recordedYears.length-1]-recordedYears[0]+1},(_,i)=>String(recordedYears[0]+i)
+  ):[];
   const series=years.map(year=>{
     const row:Record<string,string|number>={year};
-    top.forEach((name,i)=>row["series"+i]=data.find(x=>x.year===year&&x.camera===name)?.count||0);
+    const entries=new Map(annual.get(year)?.map(entry=>[entry.name,entry.count]));
+    names.forEach((name,i)=>row["series"+i]=entries.get(name)||0);
     return row;
   });
   const color=photoGearColor;
-  return <Panel title="年度机身更替" desc="前六款常用机身的年度拍摄次数；每年一列，颜色对应同一机身" wide>
-    {series.length&&top.length?<>
-      <div className="h-72">
+  return <Panel title={"年度"+kind+"更替"} desc={unavailable?"当前服务尚未提供镜头年度数据，升级服务后可查看":
+    "每年独立取使用次数前十；仅计入当年入榜器材，面积按拍摄次数堆积，颜色保持一致"} wide>
+    {series.length&&names.length?<>
+      <div className="h-72" role="img" aria-label={"年度"+kind+"使用堆积面积图"}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={series} margin={{top:6,right:12,bottom:0,left:-12}}>
+          <AreaChart data={series} margin={{top:12,right:12,bottom:0,left:0}}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.15}/>
             <XAxis dataKey="year" tick={{fontSize:11}}/>
-            <YAxis allowDecimals={false} tick={{fontSize:11}}/>
-            <Tooltip formatter={(value,name)=>[count(Number(value))+" 次",name]}/>
-            {top.map((name,i)=><Bar {...motion} key={name} dataKey={"series"+i}
-              name={photoGearLabel(name)} stackId="gear" fill={color(name)} maxBarSize={48}/>)}
-          </BarChart>
+            <YAxis allowDecimals={false} tick={{fontSize:11}} tickFormatter={value=>count(Number(value))} width={60}/>
+            <Tooltip content={({active,label,payload})=>active&&payload?.length?<div className="rounded-xl border border-line bg-panel p-3 shadow-xl text-xs text-textPrimary">
+              <p className="font-semibold">{label} 年 · 前十合计 {count(payload.reduce((sum,item)=>sum+Number(item.value||0),0))} 次</p>
+              <div className="mt-2 space-y-1">{payload.filter(item=>Number(item.value)>0)
+                .sort((a,b)=>Number(b.value)-Number(a.value)).map(item=><div key={String(item.dataKey)} className="flex justify-between gap-4">
+                  <span style={{color:item.color}}>{item.name}</span><span>{count(Number(item.value))} 次</span>
+                </div>)}</div>
+            </div>:null}/>
+            {names.map((name,i)=><Area {...motion} key={name} dataKey={"series"+i} type="monotone"
+              name={photoGearLabel(name)} stackId="gear" stroke={color(name)} strokeWidth={2}
+              fill={color(name)} fillOpacity={0.65} dot={series.length===1?{r:3}:false} activeDot={{r:4}}/>)}
+          </AreaChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex flex-wrap gap-2 mt-4">{top.map(name=><button key={name}
+      <div className="flex flex-wrap gap-2 mt-4 max-h-36 overflow-y-auto">{names.map(name=><button key={name}
         className="inline-flex items-center gap-2 rounded-lg border border-line px-2.5 py-1.5 text-xs text-textPrimary hover:border-accent"
         type="button" onClick={()=>onChoose(name)}>
         <span className="h-2.5 w-2.5 rounded-full" style={{backgroundColor:color(name)}} aria-hidden="true"/>
         {photoGearLabel(name)}
       </button>)}</div>
+      <details className="mt-4">
+        <summary className="text-xs text-accent cursor-pointer">查看每年{kind}前十 / 筛选</summary>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3 max-h-80 overflow-y-auto">
+          {[...annual].sort(([a],[b])=>a.localeCompare(b)).map(([year,entries])=><div key={year}>
+            <h4 className="mb-2 text-sm font-semibold text-textPrimary">{year} 年</h4>
+            <ol className="space-y-1">{entries.map((entry,i)=><li key={entry.name}>
+              <button type="button" className="w-full flex justify-between gap-3 text-left text-xs text-textSecondary hover:text-accent"
+                aria-label={year+" 年第 "+(i+1)+" 名 "+photoGearLabel(entry.name)+"："+count(entry.count)+" 次"}
+                onClick={()=>onChoose(entry.name)}>
+                <span>{i+1}. {photoGearLabel(entry.name)}</span><span className="shrink-0">{count(entry.count)} 次</span>
+              </button>
+            </li>)}</ol>
+          </div>)}
+        </div>
+      </details>
     </>:<NoData/>}
   </Panel>;
 }
@@ -584,8 +624,10 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
             if(found)onApplyRules([...fieldRules("camera.model_norm",found.camera),
               ...fieldRules("lens.model_norm",found.lens)]);
           }}/>
-        <CameraByYear data={d.gear.camera_years} cameras={d.gear.cameras}
+        <GearByYear kind="机身" data={d.gear.camera_years.map(point=>({...point,name:point.camera}))}
           onChoose={name=>choose("camera.model_norm",name)}/>
+        <GearByYear kind="镜头" data={(d.gear.lens_years??[]).map(point=>({...point,name:point.lens}))}
+          unavailable={d.gear.lens_years===undefined} onChoose={name=>choose("lens.model_norm",name)}/>
         <Donut title="相机品牌占比" desc="依据 EXIF 品牌，未记录会单独标出"
           items={d.gear.makers} onChoose={name=>choose("camera.make",name)}/>
         <GearMatrix cameras={d.gear.cameras} lenses={d.gear.lenses} data={d.gear.lens_by_camera}

@@ -139,6 +139,19 @@ def _calendar(db: sqlite3.Connection) -> list[dict]:
         "WHERE shot_at IS NOT NULL GROUP BY date ORDER BY date LIMIT 20000")
 
 
+def _gear_years(db: sqlite3.Connection, kind: str) -> list[dict]:
+    column = {"camera": "camera_norm", "lens": "lens_norm"}[kind]
+    # Rank within each year so older favourites survive the overall Top 16 cutoff.
+    return grouped(db,
+        f"WITH annual AS (SELECT substr(shot_at,1,4) AS year,{column} AS name,"
+        f"COUNT(*) AS count FROM captures WHERE shot_at IS NOT NULL "
+        f"AND {column} IS NOT NULL AND TRIM({column}) NOT IN ('','未记录') "
+        "GROUP BY year,name), ranked AS (SELECT *,ROW_NUMBER() OVER "
+        "(PARTITION BY year ORDER BY count DESC,name) AS position FROM annual) "
+        f"SELECT year,name AS {kind},count FROM ranked WHERE position<=10 "
+        "ORDER BY year,position")
+
+
 def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
     """Return bounded aggregated series. No entire source-file listing is returned."""
     where, args = service.compile_filter(filter_ast)
@@ -231,10 +244,8 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
                 "SELECT COALESCE(camera_norm,'未记录') AS camera,"
                 "COALESCE(lens_norm,'未记录') AS lens,COUNT(*) AS count "
                 "FROM captures GROUP BY camera,lens ORDER BY count DESC LIMIT 50"),
-            "camera_years": grouped(db,
-                "SELECT substr(shot_at,1,4) AS year,COALESCE(camera_norm,'未记录') AS camera,"
-                "COUNT(*) AS count FROM captures WHERE shot_at IS NOT NULL "
-                "GROUP BY year,camera ORDER BY year,camera LIMIT 1500"),
+            "camera_years": _gear_years(db, "camera"),
+            "lens_years": _gear_years(db, "lens"),
             "lens_by_camera": grouped(db,
                 "SELECT COALESCE(camera_norm,'未记录') AS camera,"
                 "COALESCE(lens_norm,'未记录') AS lens,COUNT(*) AS count "

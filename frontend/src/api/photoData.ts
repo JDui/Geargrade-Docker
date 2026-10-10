@@ -54,6 +54,7 @@ export type PhotoAnalytics = {
     cameras: AnalyticsCount[]; lenses: AnalyticsCount[]; makers: AnalyticsCount[];
     combos: { camera: string; lens: string; count: number }[];
     camera_years: { year: string; camera: string; count: number }[];
+    lens_years?: { year: string; lens: string; count: number }[];
     lens_by_camera: { camera: string; lens: string; count: number }[];
   };
   exposure: {

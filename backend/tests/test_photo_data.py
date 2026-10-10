@@ -253,7 +253,51 @@ def test_analytics_all_views_and_physical_vs_capture(photo_env, monkeypatch):
     assert sum(x["count"] for x in details["files"]["orientation"]) == 3
     assert details["quality"][0]["count"] == 3
     assert next(x for x in details["quality"] if x["name"] == "镜头")["count"] == 2
+    assert details["gear"]["lens_years"] == [
+        {"year": "2024", "lens": "tamron 28-200mm", "count": 1},
+        {"year": "2025", "lens": "fe 35mm f1.8", "count": 1},
+    ]
     assert "GPS" not in str(details)
+
+
+def test_annual_gear_top_ten_is_independent_per_year_and_filtered(photo_env):
+    from app.photo_data.analytics import analyze
+
+    sid = service.add_source({"name": "Annual gear", "root_path": str(photo_env)})["id"]
+    with db.connect() as connection:
+        def insert(key, year, camera, lens, family="raw"):
+            filename = key + (".arw" if family == "raw" else ".jpg")
+            connection.execute("""
+                INSERT INTO photos (source_id,relpath,filename,ext,format_family,size_bytes,
+                    mtime_ns,capture_key,shot_at,camera_norm,lens_norm,parse_status,updated_at)
+                VALUES (?,?,?,?,?,1,1,?,?,?,?,'ok','2026-10-10')
+            """, (sid, filename, filename, Path(filename).suffix, family, key,
+                  year + "-01-01T12:00:00" if year else None, camera, lens))
+        for year, repeats in (("2023", 1), ("2025", 2)):
+            for index in range(11):
+                for repetition in range(repeats):
+                    insert(f"{year}-{index:02}-{repetition}", year,
+                           f"body-{year}-{index:02}", f"lens-{year}-{index:02}")
+        insert("2023-00-0", "2023", "body-2023-00", "lens-2023-00", "jpeg")
+        for index in range(50):
+            insert(f"unknown-{index}", "2023", None, None)
+        insert("undated", None, "undated", "undated")
+
+    result = analyze()
+    for field, key in (("camera_years", "camera"), ("lens_years", "lens")):
+        annual = result["gear"][field]
+        assert len(annual) == 20
+        for year, repeats in (("2023", 1), ("2025", 2)):
+            rows = [row for row in annual if row["year"] == year]
+            prefix = "body" if key == "camera" else "lens"
+            assert [row[key] for row in rows] == [f"{prefix}-{year}-{i:02}" for i in range(10)]
+            assert all(row["count"] == repeats for row in rows)
+    assert "body-2023-09" not in {row["name"] for row in result["gear"]["cameras"]}
+    selected = analyze({"version": "photo-filter.v1", "group": {
+        "field": "capture.year", "op": "eq", "value": "2023"}})
+    assert len(selected["gear"]["camera_years"]) == 10
+    assert len(selected["gear"]["lens_years"]) == 10
+    assert all(row["year"] == "2023" for row in selected["gear"]["lens_years"])
 
 
 def test_numeric_distributions_preserve_values_merge_drift_and_filter_counts(photo_env):

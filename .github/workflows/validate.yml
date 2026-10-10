@@ -1,4 +1,4 @@
-name: Validate Geargrade 1.0.1
+name: Validate Geargrade 1.0.2
 on:
   push:
     branches: [main]

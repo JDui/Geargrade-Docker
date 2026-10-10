@@ -116,6 +116,8 @@ describe("PhotoAnalyticsDashboard",()=>{
     const focal=screen.getByRole("heading",{name:"35mm 等效焦距分布"}).closest("section")!;
     expect(iso.querySelector(".recharts-line-curve")).not.toBeNull();
     expect(focal.querySelector(".recharts-line-curve")).not.toBeNull();
+    expect(iso.querySelector(".recharts-line-curve")?.getAttribute("d")).toContain("C");
+    expect(focal.querySelector(".recharts-line-curve")?.getAttribute("d")).toContain("C");
     expect(iso.querySelector(".recharts-bar")).toBeNull();
     fireEvent.click(within(iso).getByRole("button",{name:/查看全部 3/}));
     expect(within(iso).getAllByRole("button",{name:/筛选 /}).map(button=>button.getAttribute("aria-label")))
@@ -176,6 +178,78 @@ describe("PhotoAnalyticsDashboard",()=>{
     expect(onApplyRules).toHaveBeenCalledWith([
       {field:"capture.date",op:"eq",value:"2025-03-17"}
     ]);
+  });
+  it("stacks camera history across missing years and keeps legend filters",async()=>{
+    const input=empty();
+    input.gear.cameras=[{name:"sony:ilce-7m4",count:6},{name:"canon:eos-r6",count:4}];
+    input.gear.camera_years=[
+      {year:"2025",camera:"canon:eos-r6",count:3},
+      {year:"2023",camera:"sony:ilce-7m4",count:2},
+      {year:"2025",camera:"sony:ilce-7m4",count:4},
+      {year:"2023",camera:"canon:eos-r6",count:1}
+    ];
+    vi.mocked(useAppSettings).mockReturnValue({reduceMotion:true} as ReturnType<typeof useAppSettings>);
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    const onApplyRules=vi.fn();
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"器材与组合"}));
+    const chart=screen.getByRole("img",{name:"年度机身使用堆积面积图"});
+    expect(chart.querySelectorAll(".recharts-area-area")).toHaveLength(2);
+    expect(chart.querySelector(".recharts-bar")).toBeNull();
+    const curves=Array.from(chart.querySelectorAll(".recharts-area-curve"),curve=>
+      (curve.getAttribute("d")!.match(/-?\d+(?:\.\d+)?/g)??[]).map(Number));
+    // Both series return to zero in the missing middle year; the final stack adds both counts.
+    expect(curves[0]).toHaveLength(14);
+    expect(curves[1]).toHaveLength(14);
+    expect(curves[0][7]).toBe(curves[1][7]);
+    expect(curves[0][7]).toBeGreaterThan(curves[0][13]);
+    expect(curves[1][13]).toBeLessThan(curves[0][13]);
+    const panel=chart.closest("section")!;
+    fireEvent.click(within(panel).getByRole("button",{name:"Sony ILCE-7M4",exact:true}));
+    expect(onApplyRules).toHaveBeenCalledWith([{field:"camera.model_norm",op:"eq",value:"sony:ilce-7m4"}]);
+  });
+  it("shows a finite camera history point for a single year",async()=>{
+    vi.mocked(useAppSettings).mockReturnValue({reduceMotion:true} as ReturnType<typeof useAppSettings>);
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={vi.fn()}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"器材与组合"}));
+    const dot=screen.getByRole("img",{name:"年度机身使用堆积面积图"}).querySelector("circle.recharts-area-dot");
+    expect(dot).not.toBeNull();
+    expect(Number.isFinite(Number(dot!.getAttribute("cx")))).toBe(true);
+    expect(Number.isFinite(Number(dot!.getAttribute("cy")))).toBe(true);
+  });
+  it("selects each year's top ten independently for cameras and lenses",async()=>{
+    const input=empty();
+    input.gear.camera_years=[];
+    input.gear.lens_years=[];
+    for(const year of ["2023","2025"]){
+      for(let i=0;i<11;i++){
+        input.gear.camera_years.push({year,camera:`body-${year}-${i}`,count:20-i});
+        input.gear.lens_years.push({year,lens:`lens-${year}-${i}`,count:20-i});
+      }
+      input.gear.camera_years.push({year,camera:"未记录",count:1000});
+      input.gear.lens_years.push({year,lens:"未记录",count:1000});
+    }
+    vi.mocked(useAppSettings).mockReturnValue({reduceMotion:true} as ReturnType<typeof useAppSettings>);
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    const onApplyRules=vi.fn();
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"器材与组合"}));
+    for(const [kind,prefix,field] of [["机身","body","camera.model_norm"],["镜头","lens","lens.model_norm"]]){
+      const panel=screen.getByRole("heading",{name:`年度${kind}更替`}).closest("section")!;
+      expect(panel.querySelectorAll(".recharts-area-area")).toHaveLength(20);
+      fireEvent.click(within(panel).getByText(`查看每年${kind}前十 / 筛选`));
+      for(const year of ["2023","2025"]){
+        const ranking=within(panel).getByRole("heading",{name:`${year} 年`}).parentElement!;
+        expect(within(ranking).getAllByRole("button")).toHaveLength(10);
+        expect(within(ranking).queryByText(new RegExp(`${prefix}-${year}-10`))).not.toBeInTheDocument();
+        fireEvent.click(within(ranking).getByRole("button",{name:`${year} 年第 10 名 ${prefix}-${year}-9：11 次`}));
+        expect(onApplyRules).toHaveBeenLastCalledWith([{field,op:"eq",value:`${prefix}-${year}-9`}]);
+      }
+      expect(within(panel).queryByText("未记录")).not.toBeInTheDocument();
+    }
   });
   it("keeps chart nodes during refresh and ignores stale chart interactions",async()=>{
     const onApplyRules=vi.fn();

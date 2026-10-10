@@ -1,10 +1,10 @@
 # Geargrade
 
-Geargrade 1.0.1 是面向个人摄影器材管理与拍摄数据分析的自托管 Web 应用。它围绕设备档案、持有状态、主观评价、买卖记录、筛选与榜单分析构建，并支持只读照片目录的 EXIF 索引和拍摄统计。
+Geargrade 1.0.2 是面向个人摄影器材管理与拍摄数据分析的自托管 Web 应用。它围绕设备档案、持有状态、主观评价、买卖记录、筛选与榜单分析构建，并支持只读照片目录的 EXIF 索引和拍摄统计。
 
 当前版本支持主设备库、独立心愿池、GGPack 数据导入导出、全量重置、本地与远程图片录入，以及围绕评分、持有时长、理财结果和拍摄数据的可视化展示。
 
-## 当前版本（v1.0.1）
+## 当前版本（v1.0.2）
 
 - 新增拍摄数据模块：手动扫描只读照片目录，使用独立 SQLite 索引解析 RAW、JPEG、HEIF 等照片的 EXIF 元数据。
 - 新增拍摄数据动态筛选、分析图表、相机与镜头使用量榜，以及扫描进度与增量索引。
@@ -142,7 +142,7 @@ deploy/
 └─ .env
 ```
 
-如果你使用本次构建的 AMD64 离线镜像包，先下载或复制 `dist/geargrade-v1.0.1-linux-amd64.tar` 到部署目录，再导入镜像。
+如果你使用本次构建的 AMD64 离线镜像包，先下载或复制 `dist/geargrade-v1.0.2-linux-amd64.tar` 到部署目录，再导入镜像。
 
 说明：
 
@@ -152,7 +152,7 @@ deploy/
 然后导入镜像：
 
 ```bash
-docker load -i geargrade-v1.0.1-linux-amd64.tar
+docker load -i geargrade-v1.0.2-linux-amd64.tar
 ```
 
 然后使用以下 Compose 模板：
@@ -160,7 +160,7 @@ docker load -i geargrade-v1.0.1-linux-amd64.tar
 ```yaml
 services:
   geargrade:
-    image: geargrade-docker-app:1.0.1
+    image: geargrade-docker-app:1.0.2
     container_name: geargrade-app
     restart: unless-stopped
     ports:
@@ -176,7 +176,7 @@ volumes:
   geargrade_media:
 ```
 
-当前归档包含 `linux/amd64` 镜像，Compose 镜像标签为 `geargrade-docker-app:1.0.1`。
+当前归档包含 `linux/amd64` 镜像，Compose 镜像标签为 `geargrade-docker-app:1.0.2`。
 
 ## 环境变量
 
