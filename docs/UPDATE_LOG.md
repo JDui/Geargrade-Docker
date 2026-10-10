@@ -8,6 +8,20 @@
 - 更新部署默认镜像标签为 `geargrade-docker-app:1.0.1`；AMD64 离线包保存在 `dist/geargrade-v1.0.1-linux-amd64.tar`。
 - 本地离线包不纳入 Git；保留常用依赖、基础镜像和依赖缓存，直至明确要求删除。
 
+### v1.0.1 本地构建与验证
+
+- 源码提交：`65ad6f72f65efdc62d41d20bea17efeebf50e0a7`
+- 平台：`linux/amd64`
+- 镜像：`geargrade-docker-app:1.0.1`
+- 文件：`dist/geargrade-v1.0.1-linux-amd64.tar`（83,987,968 字节，约 80 MB）
+- SHA-256：`d180be89263d3c31835664c16358297e3426352f9ec8c665a88ccf3f50dab0b9`
+- 验证：前端 60 项、后端 44 项测试通过；镜像导入、版本/架构标签、服务启动、健康接口、前端页面和 ExifTool 检查通过。
+- 前端依赖审计仍报告 15 项漏洞（7 项中危、6 项高危、2 项严重），未升级依赖。
+
+```bash
+docker load -i geargrade-v1.0.1-linux-amd64.tar
+```
+
 ## 2026-10-10：v1.0.0 AMD64 更新
 
 源码基于 `main` 分支提交 `78c4c80c7cd48d34f16a1593389f123d277a746b`。
