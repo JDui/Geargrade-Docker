@@ -74,7 +74,7 @@ Geargrade 1.0.2 是面向个人摄影器材管理与拍摄数据分析的自托�
 
 ## 页面截图
 
-以下截图通过本地无头浏览器静默生成，文件位于 `docs/screenshots/`。
+以下为 v1.0.2 页面截图，通过本地无头浏览器生成，文件位于 `docs/screenshots/`。设备数据使用内置示例，拍摄数据使用隔离演示索引，不包含真实照片或个人数据。
 
 ### 首页总览
 
@@ -112,6 +112,42 @@ CList 页面位于独立 `/clist` 路由，按购入年份组织设备时间树�
 
 ![新增设备](docs/screenshots/device-form.png)
 
+### 设备档案
+
+档案页面支持按类别、状态、评分和购入年份筛选，并可从「正在感受」入口查看对应设备。
+
+![设备档案](docs/screenshots/archive-page.png)
+
+### 拍摄数据总览
+
+展示逻辑拍摄、物理文件、RAW 占比和存储统计，以及年度、月度和常用机身分析。
+
+![拍摄数据总览](docs/screenshots/photo-overview.png)
+
+### 器材与组合分析
+
+展示机身、镜头和组合排行，以及逐年独立排名的机身与镜头年度前十更替图；图例和排名明细可用于筛选。
+
+![器材与组合分析](docs/screenshots/photo-gear.png)
+
+### 曝光与焦距
+
+ISO 与等效焦距保留逐值统计，使用平滑曲线展示；光圈、快门和曝光补偿提供分布与筛选入口。
+
+![曝光与焦距](docs/screenshots/photo-exposure.png)
+
+### 拍摄时间
+
+多年份日历热力图支持年份范围选择，配合小时、星期和月份统计查看拍摄规律。
+
+![拍摄时间](docs/screenshots/photo-timeline.png)
+
+### 照片明细
+
+照片明细位于数据工具页，默认折叠；展开后可搜索文件、查看元数据并导出索引结果。
+
+![照片明细](docs/screenshots/photo-files.png)
+
 ## 快速开始
 
 1. 复制环境变量文件
@@ -142,7 +178,7 @@ deploy/
 └─ .env
 ```
 
-如果你使用本次构建的 AMD64 离线镜像包，先下载或复制 `dist/geargrade-v1.0.2-linux-amd64.tar` 到部署目录，再导入镜像。
+AMD64 离线镜像包可从 [v1.0.2 Release](https://github.com/JDui/Geargrade-Docker/releases/tag/v1.0.2) 下载。先下载或复制 `dist/geargrade-v1.0.2-linux-amd64.tar` 到部署目录，再导入镜像。
 
 说明：
 
