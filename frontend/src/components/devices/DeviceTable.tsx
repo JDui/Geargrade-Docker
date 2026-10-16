@@ -8,8 +8,9 @@ import {
   type SortBy,
   type SortOrder
 } from "../../types/device";
-import { formatCurrency, formatDailyCost, formatDate } from "../../utils/format";
+import { formatCurrency, formatDate } from "../../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../../utils/device";
+import { DailyCostValue } from "./DailyCostValue";
 
 interface DeviceTableProps {
   items: DeviceListItem[];
@@ -92,7 +93,7 @@ export function DeviceTable({
                   <td className="px-4 py-4">{formatCurrency(device.purchase_price)}</td>
                   <td className="px-4 py-4">{formatDate(device.purchase_date, datePrecision)}</td>
                   <td className="px-4 py-4">{formatDate(device.sale_date, datePrecision)}</td>
-                  <td className="px-4 py-4">{formatDailyCost(device.daily_cost_value)}</td>
+                  <td className="px-4 py-4"><DailyCostValue value={device.daily_cost_value} /></td>
                   <td className="px-4 py-4">
                     <div className="flex justify-end gap-2">
                       <button

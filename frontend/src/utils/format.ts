@@ -14,7 +14,7 @@ export function formatDailyCost(value: number | null | undefined): string {
     return "未计算";
   }
 
-  const prefix = value > 0 ? "" : value < 0 ? "-" : "";
+  const prefix = value < 0 ? "+" : "";
   const absValue = Math.abs(value);
   const amount = new Intl.NumberFormat("zh-CN", {
     style: "currency",

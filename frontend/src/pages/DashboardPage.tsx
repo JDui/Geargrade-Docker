@@ -7,12 +7,13 @@ import { AnnualPurchaseChart } from "../components/dashboard/AnnualPurchaseChart
 import { CategoryDonutChart } from "../components/dashboard/CategoryDonutChart";
 import { RatingBarChart } from "../components/dashboard/RatingBarChart";
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
+import { DailyCostValue } from "../components/devices/DailyCostValue";
 import { useAppSettings } from "../components/layout/AppSettingsProvider";
 import { useDashboardSummary } from "../components/layout/DashboardSummaryProvider";
 import { useAnimatedRouteClose } from "../hooks/useAnimatedRouteClose";
 import { useBodyScrollLock } from "../hooks/useBodyScrollLock";
 import { STATUS_LABELS, type AnnualBreakdownMode, type DeviceListItem } from "../types/device";
-import { formatDailyCost, formatDate } from "../utils/format";
+import { formatDate } from "../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../utils/device";
 
 const HOLDING_STATUSES = new Set(["holding", "for_sale"]);
@@ -62,7 +63,7 @@ function OverviewTeaser({ device, onOpen }: { device: DeviceListItem; onOpen: ()
         </div>
         <div>
           <div className="overview-teaser-label">每日成本</div>
-          <div className="overview-teaser-value">{formatDailyCost(device.daily_cost_value)}</div>
+          <div className="overview-teaser-value"><DailyCostValue value={device.daily_cost_value} /></div>
         </div>
       </div>
     </button>

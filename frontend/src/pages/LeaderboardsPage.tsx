@@ -7,6 +7,7 @@ import {
   fetchScoreLeaderboard
 } from "../api/leaderboards";
 import { DeviceDetailDrawer } from "../components/devices/DeviceDetailDrawer";
+import { DailyCostValue } from "../components/devices/DailyCostValue";
 import PhotoUsageLeaderboard from "../components/photo-data/PhotoUsageLeaderboard";
 import { useAppSettings } from "../components/layout/AppSettingsProvider";
 import {
@@ -20,7 +21,7 @@ import {
   type SortOrder
 } from "../types/device";
 import { ratingLabelText } from "../utils/device";
-import { formatCurrency, formatDailyCost, formatDate, formatDurationDays, formatDurationMonths } from "../utils/format";
+import { formatCurrency, formatDate, formatDurationDays, formatDurationMonths } from "../utils/format";
 
 type RankedEntry = {
   rank: number;
@@ -29,6 +30,7 @@ type RankedEntry = {
   brand: string;
   headline: string;
   meta: string;
+  dailyCost: number | null;
 };
 
 const VALID_TABS: LeaderboardTab[] = ["holding-duration", "score", "finance", "photo-usage"];
@@ -58,7 +60,8 @@ function normalizeEntries(
       name: item.name,
       brand: item.brand,
       headline: durationUnit === "months" ? formatDurationMonths(item.duration_months) : formatDurationDays(item.duration_days),
-      meta: `${formatDate(item.purchase_date, datePrecision)} 至 ${item.sale_date ? formatDate(item.sale_date, datePrecision) : "现在"} · ${formatDailyCost(item.daily_cost_value)}`
+      meta: `${formatDate(item.purchase_date, datePrecision)} 至 ${item.sale_date ? formatDate(item.sale_date, datePrecision) : "现在"}`,
+      dailyCost: item.daily_cost_value
     }));
   }
 
@@ -69,7 +72,8 @@ function normalizeEntries(
       name: item.name,
       brand: item.brand,
       headline: `${item.profit_value >= 0 ? "+" : ""}${formatCurrency(item.profit_value)}`,
-      meta: `买入 ${formatCurrency(item.purchase_price)} / 卖出 ${formatCurrency(item.sale_price)} · ${formatDailyCost(item.daily_cost_value)}`
+      meta: `买入 ${formatCurrency(item.purchase_price)} / 卖出 ${formatCurrency(item.sale_price)}`,
+      dailyCost: item.daily_cost_value
     }));
   }
 
@@ -79,7 +83,8 @@ function normalizeEntries(
     name: item.name,
     brand: item.brand,
     headline: `${item.score}`,
-    meta: `${ratingLabelText(item.rating_label)} · ${formatDailyCost(item.daily_cost_value)}`
+    meta: ratingLabelText(item.rating_label),
+    dailyCost: item.daily_cost_value
   }));
 }
 
@@ -120,7 +125,7 @@ function PodiumCard({
 
       <div className="mt-8">
         <div className="podium-headline">{entry.headline}</div>
-        <div className="mt-2 text-sm leading-6 text-textSecondary">{entry.meta}</div>
+        <div className="mt-2 text-sm leading-6 text-textSecondary">{entry.meta} · <DailyCostValue value={entry.dailyCost} /></div>
       </div>
     </button>
   );
@@ -153,7 +158,7 @@ function LeaderboardList({
           </div>
           <div className="text-right">
             <div className="text-lg font-semibold text-textPrimary">{entry.headline}</div>
-            <div className="text-sm text-textSecondary">{entry.meta}</div>
+            <div className="text-sm text-textSecondary">{entry.meta} · <DailyCostValue value={entry.dailyCost} /></div>
           </div>
         </button>
       ))}

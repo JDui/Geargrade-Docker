@@ -8,7 +8,8 @@ import { useBodyScrollLock } from "../../hooks/useBodyScrollLock";
 import { useAppSettings } from "../layout/AppSettingsProvider";
 import type { DeviceDetail } from "../../types/device";
 import { CATEGORY_LABELS, STATUS_LABELS } from "../../types/device";
-import { formatCurrency, formatDailyCost, formatDate } from "../../utils/format";
+import { formatCurrency, formatDate } from "../../utils/format";
+import { DailyCostValue } from "./DailyCostValue";
 import {
   formatDeviceTitle,
   isFeelingScore,
@@ -275,7 +276,7 @@ export function DeviceDetailDrawer({
                     </div>
                     <div className="drawer-info-card sm:col-span-2">
                       <div className="drawer-info-label">每日成本</div>
-                      <div className="drawer-info-value text-lg">{formatDailyCost(device.daily_cost_value)}</div>
+                      <div className="drawer-info-value text-lg"><DailyCostValue value={device.daily_cost_value} /></div>
                     </div>
                   </div>
 

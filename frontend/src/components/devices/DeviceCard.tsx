@@ -2,9 +2,10 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { useAppSettings } from "../layout/AppSettingsProvider";
 import { CATEGORY_LABELS, STATUS_LABELS, type DeviceListItem } from "../../types/device";
-import { formatCurrency, formatDailyCost, formatDate } from "../../utils/format";
+import { formatCurrency, formatDate } from "../../utils/format";
 import { formatDeviceTitle, isFeelingScore, isUnratedScore, ratingLabelText } from "../../utils/device";
 import { CategoryIconFallback } from "./CategoryIcon";
+import { DailyCostValue } from "./DailyCostValue";
 
 function statusClass(status: DeviceListItem["status"]) {
   const palette: Record<DeviceListItem["status"], string> = {
@@ -110,7 +111,7 @@ export function DeviceCard({
           </div>
           <div className="rounded-xl bg-panelAlt px-3 py-2">
             <div className="text-[11px] uppercase tracking-[0.16em] text-textSecondary">每日成本</div>
-            <div className="mt-1 text-sm font-medium text-textPrimary">{formatDailyCost(device.daily_cost_value)}</div>
+            <div className="mt-1 text-sm font-medium text-textPrimary"><DailyCostValue value={device.daily_cost_value} /></div>
           </div>
         </div>
 
