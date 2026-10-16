@@ -21,7 +21,8 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,id=geargrade-pip,target=/root/.cache/pip \
+    pip install --timeout 120 --retries 5 -r requirements.txt
 
 COPY backend/ .
 COPY templates/ /app/templates
