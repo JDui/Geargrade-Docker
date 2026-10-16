@@ -58,6 +58,7 @@
 | GET /aliases | 原始设备名称与匹配状态 |
 | PUT /aliases/{id} | 用户确认或撤销设备别名关联 |
 | POST /exports | 以筛选 JSON + 脱敏设置创建一次性导出或流式响应；只读 DB |
+| POST /exports/statistics | 当前筛选的图表统计 ZIP，含 JSON、CSV、筛选快照与口径；只读索引，不受分页影响 |
 | GET /exports/{export_id} | 导出结果/下载状态；只读 DB 与 app data 导出缓存，不访问照片源 |
 
 响应 Schema 统一包括 schema_version、snapshot_id、as_of（成功扫描发布时间）、filters、counts、warnings；数据来源为“最后一次已发布完整扫描”。无数据返回空列表/空数组、说明 unavailable，而非 500。时间采用 ISO 8601（包含时区或明确 local/unknown），大小以 bytes、焦距 mm、曝光秒记录，不定义或返回任何位置或 GPS 字段。API 拆分统计和扫描作业，禁把前端多图表请求变成扫描触发器。
@@ -93,6 +94,14 @@
 - MakerNotes 可以包含隐藏的位置/设备身份信息；入库前即采用位置字段 denylist + 合法安全字段 allowlist 清洗，原始全量 ExifTool JSON 不得绕过 GPS 剔除规则，导出再实施敏感字段审查；“默认脱敏”不等于保证完全匿名。
 - 导出仅从 SQLite 和 app data 缓存读取，不得扫描原始照片目录；可选择是否包含 soft-delete 记录（默认否）、扫描错误（默认摘要）。
 - 数据可离线使用，无网络依赖；建议使用 JSONL.gz 流式解压，避免把大型数组一次装入 Agent context。
+
+### 当前筛选的图表统计包（已实现）
+
+数据工具 → 照片明细（展开）→ 图表统计导出，调用 `POST /api/v1/photo-data/exports/statistics`，请求体为 `{ "filter": <photo-filter.v1> }`。文件名/路径搜索合并进同一个筛选 AST，返回 ZIP，不使用明细的 limit/offset。
+
+包格式为 `geargrade.photo-statistics.v1`，包含 `README.md`、`manifest.json`、`filter.json`、`analytics.json` 和按时间、器材、曝光、文件分类的 CSV。一次聚合生成整包，各表共用同一筛选快照；不读取照片源。JSON 保留原值，CSV 使用带 BOM 的 UTF-8，空单元格代表缺失，公式样式文本加前导单引号。包内不含照片明细和已移除的未解码分类。
+
+统计范围不限当前分页，但排名与日历沿用图表限制，详见 manifest 的 limits；`is_other=true` 表示合并剩余类别。manifest 附导出时间、索引时间（无成功扫描时为空）、统计单位、热力图分桶边界和各 CSV 的列定义及统计粒度，便于离线快速分析。
 
 ## 5. 视觉交互和无障碍验收
 

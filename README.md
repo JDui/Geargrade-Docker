@@ -1,10 +1,21 @@
 # Geargrade
 
-Geargrade 1.0.2 是面向个人摄影器材管理与拍摄数据分析的自托管 Web 应用。它围绕设备档案、持有状态、主观评价、买卖记录、筛选与榜单分析构建，并支持只读照片目录的 EXIF 索引和拍摄统计。
+Geargrade 1.1.1 是面向个人摄影器材管理与拍摄数据分析的自托管 Web 应用。它围绕设备档案、持有状态、主观评价、买卖记录、筛选与榜单分析构建，并支持只读照片目录的 EXIF 索引和拍摄统计。
 
 当前版本支持主设备库、独立心愿池、GGPack 数据导入导出、全量重置、本地与远程图片录入，以及围绕评分、持有时长、理财结果和拍摄数据的可视化展示。
 
-## 当前版本（v1.0.2）
+## v1.1.1：拍摄统计口径修正与统计导出（2026-10-16）
+
+- 移除未解码的闪光灯、白平衡、对焦、驱动、快门类型、创意风格和色彩空间图表；未校正 EXIF 旋转方向的横竖拍图也不再展示。保留可解释的曝光、焦距、器材、时间与文件统计。
+- 无效曝光数值和镜头占位符在读取旧索引时统一视为缺失；图表、筛选、明细和导出共享处理规则，不自动改写旧数据库或重扫原片。
+- 饼图按完整统计范围计算占比，单列未记录与未展示类别；时间轴补齐空年份和空月份，并提示缺少日期的拍摄。
+- 快门分布改用对数时间轴曲线，保留逐值数据与筛选；同次拍摄优先选取核心参数更完整的代表文件。
+- 修复打开页面时自动提交偏好设置的问题，仅在用户实际修改设置后提交。
+- 数据工具的照片明细中增加图表统计导出，按当前筛选与文件搜索下载 JSON、CSV 汇总包，附统计时间与口径说明。
+
+NAS 只读排查证据、统计边界与验证结果见[本次排查记录](docs/photo-data/AUDIT_2026_10_16.md)。下方页面截图仍为 v1.0.2 的历史截图。
+
+## 当前版本（v1.1.1）
 
 - 新增拍摄数据模块：手动扫描只读照片目录，使用独立 SQLite 索引解析 RAW、JPEG、HEIF 等照片的 EXIF 元数据。
 - 新增拍摄数据动态筛选、分析图表、相机与镜头使用量榜，以及扫描进度与增量索引。
@@ -146,6 +157,8 @@ ISO 与等效焦距保留逐值统计，使用平滑曲线展示；光圈、快�
 
 照片明细位于数据工具页，默认折叠；展开后可搜索文件、查看元数据并导出索引结果。
 
+「导出当前筛选的图表统计」下载 `geargrade-photo-statistics.zip`，包含各图表的 CSV、完整汇总 JSON、筛选条件和统计口径说明。导出包含当前全局筛选及文件名/路径搜索下的全部匹配数据，不限当前分页；排名保留图表的 Top N 和其余类别。
+
 ![照片明细](docs/screenshots/photo-files.png)
 
 ## 快速开始
@@ -178,7 +191,7 @@ deploy/
 └─ .env
 ```
 
-AMD64 离线镜像包可从 [v1.0.2 Release](https://github.com/JDui/Geargrade-Docker/releases/tag/v1.0.2) 下载。先下载或复制 `dist/geargrade-v1.0.2-linux-amd64.tar` 到部署目录，再导入镜像。
+当前 v1.1.1 AMD64 离线镜像包由本地构建生成。历史版本可从 [GitHub Releases](https://github.com/JDui/Geargrade-Docker/releases) 下载。先复制 `dist/geargrade-v1.1.1-linux-amd64.tar` 到部署目录，再导入镜像。
 
 说明：
 
@@ -188,7 +201,7 @@ AMD64 离线镜像包可从 [v1.0.2 Release](https://github.com/JDui/Geargrade-D
 然后导入镜像：
 
 ```bash
-docker load -i geargrade-v1.0.2-linux-amd64.tar
+docker load -i geargrade-v1.1.1-linux-amd64.tar
 ```
 
 然后使用以下 Compose 模板：
@@ -196,7 +209,7 @@ docker load -i geargrade-v1.0.2-linux-amd64.tar
 ```yaml
 services:
   geargrade:
-    image: geargrade-docker-app:1.0.2
+    image: geargrade-docker-app:1.1.1
     container_name: geargrade-app
     restart: unless-stopped
     ports:
@@ -212,7 +225,7 @@ volumes:
   geargrade_media:
 ```
 
-当前归档包含 `linux/amd64` 镜像，Compose 镜像标签为 `geargrade-docker-app:1.0.2`。
+当前归档包含 `linux/amd64` 镜像，Compose 镜像标签为 `geargrade-docker-app:1.1.1`。
 
 ## 环境变量
 

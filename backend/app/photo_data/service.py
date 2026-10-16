@@ -18,6 +18,7 @@ import threading
 import uuid
 import zipfile
 from collections import Counter
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -157,6 +158,50 @@ OPS = {"eq", "ne", "in", "not_in", "gte", "gt", "lte", "lt", "between",
        "contains", "not_contains", "is_missing", "is_present"}
 SCAN_LOCK = threading.Lock()
 
+MISSING_TEXT = ("", "-", "--", "---", "----", "unknown", "n/a", "none", "null", "未记录")
+POSITIVE_FIELDS = ("iso", "aperture", "shutter", "focal_mm", "width_px", "height_px")
+
+
+def clean_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return None if text.lower() in MISSING_TEXT else text
+
+
+def positive_number(value: Any) -> float | None:
+    parsed = number(value)
+    return parsed if parsed is not None and parsed > 0 else None
+
+
+@contextmanager
+def indexed_connection():
+    """Normalize legacy metadata in a connection-local view, without rewriting it.
+
+    Filters, file lists, exports and aggregates must see the same missing values.
+    A read transaction keeps multi-query results on one published snapshot.
+    """
+    expressions = {column: column for column in ("id", *COLUMNS)}
+    for column in ("shot_at", "camera_make", "camera_norm", "lens_norm"):
+        missing = ",".join("'" + value + "'" for value in MISSING_TEXT)
+        expressions[column] = (
+            f"CASE WHEN LOWER(TRIM({column})) IN ({missing}) THEN NULL "
+            f"ELSE TRIM({column}) END AS {column}"
+        )
+    for column in POSITIVE_FIELDS:
+        expressions[column] = (
+            f"CASE WHEN typeof({column}) IN ('integer','real') "
+            f"AND {column}>0 AND {column}<1e15 THEN {column} END AS {column}"
+        )
+    db = connect()
+    try:
+        db.execute("BEGIN")
+        db.execute("CREATE TEMP VIEW indexed_photos AS SELECT " +
+                   ",".join(expressions.values()) + " FROM main.photos")
+        yield db
+    finally:
+        db.close()
+
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -208,6 +253,7 @@ def delete_source(source_id: str) -> None:
 
 
 def normalize_camera(make: Any, model: Any) -> str | None:
+    model = clean_text(model)
     if not model:
         return None
     maker = str(make or "").strip().lower().replace("corporation", "").replace("imaging", "").strip()
@@ -259,13 +305,13 @@ def sanitize_tags(tags: dict) -> dict:
 
 def metadata(tags: dict, relpath: str, size: int, mtime_ns: int, source_id: str) -> dict:
     tags = sanitize_tags(tags)
-    shot = parse_time(tags.get("SubSecDateTimeOriginal") or tags.get("DateTimeOriginal")
-                      or tags.get("CreateDate"))
+    shot = next((parsed for tag in ("SubSecDateTimeOriginal", "DateTimeOriginal", "CreateDate")
+                 if (parsed := parse_time(tags.get(tag))) is not None), None)
     ext = Path(relpath).suffix.lower()
     make = tags.get("Make")
     model = tags.get("Model")
     camera = normalize_camera(make, model)
-    lens = str(tags["LensModel"]).strip() if tags.get("LensModel") else None
+    lens = clean_text(tags.get("LensModel"))
     lens_norm = lens.lower() if lens else None
     parent = posixpath.dirname(relpath)
     stem = Path(relpath).stem.lower()
@@ -278,11 +324,11 @@ def metadata(tags: dict, relpath: str, size: int, mtime_ns: int, source_id: str)
         "camera_make": str(make) if make else None,
         "camera_model": str(model) if model else None, "camera_norm": camera,
         "lens_model": lens, "lens_norm": lens_norm,
-        "iso": number(tags.get("ISO")), "aperture": number(tags.get("FNumber")),
-        "shutter": number(tags.get("ExposureTime")),
-        "focal_mm": number(tags.get("FocalLength")),
-        "width_px": number(tags.get("ExifImageWidth") or tags.get("ImageWidth")),
-        "height_px": number(tags.get("ExifImageHeight") or tags.get("ImageHeight")),
+        "iso": positive_number(tags.get("ISO")), "aperture": positive_number(tags.get("FNumber")),
+        "shutter": positive_number(tags.get("ExposureTime")),
+        "focal_mm": positive_number(tags.get("FocalLength")),
+        "width_px": positive_number(tags.get("ExifImageWidth")) or positive_number(tags.get("ImageWidth")),
+        "height_px": positive_number(tags.get("ExifImageHeight")) or positive_number(tags.get("ImageHeight")),
         "exposure_comp": number(tags.get("ExposureCompensation")),
         "flash": str(tags["Flash"]) if tags.get("Flash") is not None else None,
         "wb": str(tags["WhiteBalance"]) if tags.get("WhiteBalance") is not None else None,
@@ -445,13 +491,13 @@ def query(filter_ast: dict | None = None, limit: int = 100, offset: int = 0) -> 
     if not 1 <= limit <= 500 or offset < 0 or offset > 10000000:
         raise ValueError("分页范围无效")
     where, params = compile_filter(filter_ast)
-    with connect() as db:
-        total = db.execute("SELECT COUNT(*) FROM photos WHERE " + where, params).fetchone()[0]
-        captures = db.execute("SELECT COUNT(DISTINCT capture_key) FROM photos WHERE " + where, params).fetchone()[0]
+    with indexed_connection() as db:
+        total = db.execute("SELECT COUNT(*) FROM indexed_photos WHERE " + where, params).fetchone()[0]
+        captures = db.execute("SELECT COUNT(DISTINCT capture_key) FROM indexed_photos WHERE " + where, params).fetchone()[0]
         data = [dict(r) for r in db.execute(
             "SELECT id,source_id,relpath,filename,ext,format_family,size_bytes,shot_at,"
             "camera_make,camera_model,camera_norm,lens_model,lens_norm,iso,aperture,shutter,"
-            "focal_mm,width_px,height_px,parse_status FROM photos WHERE " + where +
+            "focal_mm,width_px,height_px,parse_status FROM indexed_photos WHERE " + where +
             " ORDER BY COALESCE(shot_at,updated_at) DESC,id DESC LIMIT ? OFFSET ?",
             (*params, limit, offset))]
     return {"total_files": total, "total_captures": captures, "items": data,
@@ -470,26 +516,26 @@ def facets(filter_ast: dict | None, field_id: str, limit: int = 100) -> dict:
                              x.get("field") != field_id and x.get("column_id") != field_id]
     where, params = compile_filter(filter_copy)
     col, _, _ = FIELDS[field_id]
-    with connect() as db:
+    with indexed_connection() as db:
         values = [dict(r) for r in db.execute(
             "SELECT " + col + " AS value,COUNT(DISTINCT capture_key) AS count "
-            "FROM photos WHERE " + where + " GROUP BY " + col +
+            "FROM indexed_photos WHERE " + where + " GROUP BY " + col +
             " ORDER BY count DESC,value LIMIT ?", (*params, limit))]
     return {"field": field_id, "options": values}
 
 
 def summary(filter_ast: dict | None = None) -> dict:
     where, params = compile_filter(filter_ast)
-    with connect() as db:
+    with indexed_connection() as db:
         row = db.execute(
             "SELECT COUNT(*) AS physical_files,COUNT(DISTINCT capture_key) AS logical_captures,"
             "COALESCE(SUM(size_bytes),0) AS total_bytes,"
-            "SUM(CASE WHEN format_family='raw' THEN 1 ELSE 0 END) AS raw_files,"
+            "COALESCE(SUM(CASE WHEN format_family='raw' THEN 1 ELSE 0 END),0) AS raw_files,"
             "MIN(shot_at) AS first_shot,MAX(shot_at) AS last_shot "
-            "FROM photos WHERE " + where, params).fetchone()
+            "FROM indexed_photos WHERE " + where, params).fetchone()
         years = [dict(x) for x in db.execute(
             "SELECT substr(shot_at,1,7) AS month,COUNT(DISTINCT capture_key) AS count "
-            "FROM photos WHERE " + where + " AND shot_at IS NOT NULL "
+            "FROM indexed_photos WHERE " + where + " AND shot_at IS NOT NULL "
             "GROUP BY month ORDER BY month", params)]
     return {**dict(row), "months": years, "as_of": status()["last_success"]}
 
@@ -499,15 +545,15 @@ def leaderboard(kind: str = "camera", filter_ast: dict | None = None, limit: int
     if kind not in ("camera", "lens") or not 1 <= limit <= 500: raise ValueError("无效榜单类型")
     col = "camera_norm" if kind == "camera" else "lens_norm"
     where, params = compile_filter(filter_ast)
-    with connect() as db:
-        all_count = db.execute("SELECT COUNT(DISTINCT capture_key) FROM photos WHERE " + where, params).fetchone()[0]
-        attributed = db.execute("SELECT COUNT(DISTINCT capture_key) FROM photos WHERE " + where +
+    with indexed_connection() as db:
+        all_count = db.execute("SELECT COUNT(DISTINCT capture_key) FROM indexed_photos WHERE " + where, params).fetchone()[0]
+        attributed = db.execute("SELECT COUNT(DISTINCT capture_key) FROM indexed_photos WHERE " + where +
                                 " AND " + col + " IS NOT NULL", params).fetchone()[0]
         records = [dict(x) for x in db.execute(
             "SELECT " + col + " AS canonical_key,COUNT(DISTINCT capture_key) AS capture_count,"
             "COUNT(DISTINCT substr(shot_at,1,10)) AS active_days,"
             "MIN(shot_at) AS first_shot_at,MAX(shot_at) AS last_shot_at "
-            "FROM photos WHERE " + where + " AND " + col + " IS NOT NULL "
+            "FROM indexed_photos WHERE " + where + " AND " + col + " IS NOT NULL "
             "GROUP BY " + col + " ORDER BY capture_count " + ("ASC" if ascending else "DESC") +
             ",canonical_key LIMIT ?", (*params, limit))]
     for i, item in enumerate(records):
@@ -552,8 +598,8 @@ def export_zip(filter_ast: dict | None) -> bytes:
             "format":"geargrade.photo-data.v1","exported_at":now(),
             "as_of":status()["last_success"],"gps_included":False,
             "fields":list(columns)},ensure_ascii=False,indent=2))
-        with connect() as db:
-            cursor = db.execute("SELECT "+",".join(columns)+" FROM photos WHERE "+where+
+        with indexed_connection() as db:
+            cursor = db.execute("SELECT "+",".join(columns)+" FROM indexed_photos WHERE "+where+
                                 " ORDER BY id",params)
             part = []
             n = 0

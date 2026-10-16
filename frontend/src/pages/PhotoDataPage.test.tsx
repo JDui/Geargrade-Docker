@@ -10,7 +10,7 @@ vi.mock("../api/photoData", async importOriginal => {
   const actual = await importOriginal<typeof api>();
   return { ...actual, ...Object.fromEntries([
     "getPhotoStatus", "getPhotoFields", "getPhotoPresets", "getPhotoQuery", "getPhotoSummary",
-    "getPhotoFacet", "getPhotoScan", "startPhotoScan", "cancelPhotoScan"
+    "getPhotoFacet", "getPhotoScan", "startPhotoScan", "cancelPhotoScan", "exportPhotoStatistics"
   ].map(name => [name, vi.fn()])) };
 });
 vi.mock("../components/photo-data/PhotoAnalyticsDashboard", () => ({
@@ -50,6 +50,7 @@ describe("PhotoDataPage regressions", () => {
     vi.mocked(api.getPhotoSummary).mockResolvedValue({physical_files:0,logical_captures:0,raw_files:0,total_bytes:0,first_shot:null,last_shot:null,months:[],as_of:null});
     vi.mocked(api.getPhotoFacet).mockImplementation(async (_filter,field)=>({field,options:[{value:field==="capture.weekday"?3:"sample",count:1}]}));
     vi.mocked(api.getPhotoScan).mockResolvedValue(run());
+    vi.mocked(api.exportPhotoStatistics).mockResolvedValue();
   });
   afterEach(()=>{vi.useRealTimers();vi.restoreAllMocks();});
 
@@ -185,6 +186,24 @@ describe("PhotoDataPage regressions", () => {
     await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalledWith({version:"photo-filter.v1",group:{op:"and",children:[
       nested,{field:"files.relpath",op:"contains",value:"DSC"}
     ]}},40,0));
+  });
+
+  it("exports chart statistics with global filters and settled file search",async()=>{
+    mount("/data-tools?photo_files=1&camera=sony%3Ailce-7m4");
+    await waitFor(()=>expect(api.getPhotoQuery).toHaveBeenCalled());
+    const button=screen.getByRole("button",{name:"导出当前筛选的图表统计"});
+    fireEvent.change(screen.getByRole("searchbox",{name:"文件名或相对路径搜索"}),{target:{value:"DSC"}});
+    expect(button).toBeDisabled();
+    await waitFor(()=>expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(()=>expect(api.exportPhotoStatistics).toHaveBeenCalledOnce());
+    const exported=vi.mocked(api.exportPhotoStatistics).mock.calls[0][0];
+    expect(exported.group).toMatchObject({op:"and",children:expect.arrayContaining([
+      expect.objectContaining({field:"camera.model_norm",op:"in",value:["sony:ilce-7m4"]}),
+      {field:"files.relpath",op:"contains",value:"DSC"}
+    ])});
+    expect(vi.mocked(api.getPhotoQuery).mock.calls.at(-1)?.[0]).toEqual(exported);
+    expect(vi.mocked(api.exportPhotoStatistics).mock.calls[0]).toHaveLength(1);
   });
 
   it("renders global filters as a centered body portal and restores scroll on Escape",async()=>{

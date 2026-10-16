@@ -104,7 +104,7 @@ describe("PhotoAnalyticsDashboard",()=>{
       iso:[point(160,2,"exposure.iso"),point(100,1,"exposure.iso"),point(125,2,"exposure.iso")],
       focal:[point(35,2,"exposure.focal_eq_mm"),point(24,1,"exposure.focal_eq_mm"),point(24.5,2,"exposure.focal_eq_mm")],
       aperture:[point(2.8,3,"exposure.aperture","F2.8",2.799999,2.828427),point(3.2,2,"exposure.aperture","F3.2",3.200000049,3.200000049)],
-      shutter:[],ev:[]
+      shutter:[point(0.001,1,"exposure.shutter","1/1000 s"),point(0.004,4,"exposure.shutter","1/250 s")],ev:[]
     };
     vi.mocked(useAppSettings).mockReturnValue({reduceMotion:true} as ReturnType<typeof useAppSettings>);
     vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
@@ -119,6 +119,9 @@ describe("PhotoAnalyticsDashboard",()=>{
     expect(iso.querySelector(".recharts-line-curve")?.getAttribute("d")).toContain("C");
     expect(focal.querySelector(".recharts-line-curve")?.getAttribute("d")).toContain("C");
     expect(iso.querySelector(".recharts-bar")).toBeNull();
+    const shutter=screen.getByRole("heading",{name:"快门速度分布"}).closest("section")!;
+    expect(shutter.querySelector(".recharts-line-curve")).not.toBeNull();
+    expect(within(shutter).getByText("1/250")).toBeInTheDocument();
     fireEvent.click(within(iso).getByRole("button",{name:/查看全部 3/}));
     expect(within(iso).getAllByRole("button",{name:/筛选 /}).map(button=>button.getAttribute("aria-label")))
       .toEqual(["筛选 100：1 次","筛选 125：2 次","筛选 160：2 次"]);
@@ -377,6 +380,71 @@ describe("PhotoAnalyticsDashboard",()=>{
     expect(options[options.length-1]).toHaveTextContent("2025-12 · 36 次");
     fireEvent.click(options[0]);
     expect(onApplyRules).toHaveBeenLastCalledWith([{field:"capture.month",op:"eq",value:"2023-01"}]);
+  });
+
+  it("keeps the full pie denominator, missing category and an unselectable remainder",async()=>{
+    const input=empty();
+    input.overview.captures=100;
+    input.gear.makers=[{name:"SONY",count:40},
+      ...Array.from({length:13},(_,i)=>({name:"Brand "+i,count:1})),
+      {name:"未记录",count:1},{name:"其他（未展示）",count:46,is_other:true}];
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    const onApplyRules=vi.fn();
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"器材与组合"}));
+    const panel=screen.getByText("相机品牌占比").closest("section")!;
+    expect(within(panel).getByRole("button",{name:"SONY 40 · 40.0%"})).toBeEnabled();
+    const remainder=within(panel).getByRole("button",{name:"其他（未展示） 48 · 48.0%"});
+    expect(remainder).toBeDisabled();
+    fireEvent.click(remainder);
+    expect(onApplyRules).not.toHaveBeenCalled();
+    fireEvent.click(within(panel).getByRole("button",{name:"未记录 1 · 1.0%"}));
+    expect(onApplyRules).toHaveBeenLastCalledWith([{field:"camera.make",op:"is_missing"}]);
+  });
+
+  it("does not present undocumented enum codes or uncorrected orientation as meaningful charts",async()=>{
+    const input=empty();
+    input.exposure.flash=[{name:"16",count:5}];
+    input.exposure.picture_style=[{name:"2048",count:5}];
+    input.files.orientation=[{name:"横向",count:5}];
+    input.files.color_space=[{name:"1",count:5}];
+    input.quality.push({name:"闪光灯",count:5,total:5});
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={vi.fn()}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"曝光与焦距"}));
+    expect(screen.getByRole("heading",{name:"ISO 感光度分布"})).toBeInTheDocument();
+    for(const title of ["闪光灯使用记录","白平衡设置","对焦模式","连拍与驱动模式","电子 / 机械快门类型","胶片模拟与创意风格"])
+      expect(screen.queryByRole("heading",{name:title})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab",{name:"文件与质量"}));
+    expect(screen.queryByRole("heading",{name:"横竖拍占比"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading",{name:"色彩空间"})).not.toBeInTheDocument();
+    expect(screen.queryByText("闪光灯")).not.toBeInTheDocument();
+  });
+
+  it("explains excluded undated captures and opens their filter",async()=>{
+    const input=empty();input.overview.dated=3;
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    const onApplyRules=vi.fn();
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    expect(screen.getByText(/有 2 次拍摄缺少日期/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"查看缺少日期的记录"}));
+    expect(onApplyRules).toHaveBeenLastCalledWith([{field:"capture.date",op:"is_missing"}]);
+  });
+
+  it("filters incomplete resolution when either dimension is missing",async()=>{
+    const input=empty();input.quality=[{name:"分辨率",count:4,total:5}];
+    vi.mocked(getPhotoAnalytics).mockResolvedValue(input);
+    const onApplyRules=vi.fn();
+    render(<PhotoAnalyticsDashboard filter={filter} refresh={0} onApplyRules={onApplyRules}/>);
+    await screen.findByText("图库指标");
+    fireEvent.click(screen.getByRole("tab",{name:"文件与质量"}));
+    fireEvent.click(screen.getByRole("button",{name:/^分辨率/}));
+    expect(onApplyRules).toHaveBeenLastCalledWith([{op:"or",children:[
+      {field:"files.width_px",op:"is_missing"},{field:"files.height_px",op:"is_missing"}
+    ]}]);
   });
 
 });

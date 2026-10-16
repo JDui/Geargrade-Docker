@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { PhotoAnalyticsDashboard } from "./PhotoAnalyticsDashboard";
 import { PhotoMetadataExplorer } from "./PhotoMetadataExplorer";
+import { PhotoStatisticsExport } from "./PhotoStatisticsExport";
 import { PhotoDatabaseMaintenance } from "./PhotoDatabaseMaintenance";
 import {
   cancelPhotoScan, createPhotoPreset, deletePhotoPreset, emptyPhotoFilter, exportPhotoData,
@@ -572,11 +573,15 @@ export function PhotoDataWorkspace({workspace}:{workspace:"charts"|"files"}) {
 
     {workspace==="charts"?
       <PhotoAnalyticsDashboard filter={filter} refresh={refresh} onApplyRules={applyChartFilter}/>:
+      <>
+      <PhotoStatisticsExport filter={fileFilter}
+        pending={loading||fileSearch.trim().slice(0,256)!==committedFileSearch}/>
       <PhotoMetadataExplorer
         results={results} loading={loading} page={page} pageSize={pageSize}
         search={fileSearch} onSearchChange={value=>{setFileSearch(value);setPage(0);}}
         onPageChange={setPage} onPageSizeChange={value=>{setPageSize(value);setPage(0);}}
         onExport={()=>void exportPhotoData(fileFilter).catch(e=>setMessage(showError(e)))}/>
+      </>
     }
   </div>;
 }

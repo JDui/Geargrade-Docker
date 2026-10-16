@@ -24,7 +24,7 @@ export default function DataToolsPage() {
         <div className="text-xs uppercase tracking-[0.22em] text-accent/80">Data Tools</div>
         <h1 className="mt-1 text-3xl font-semibold text-textPrimary">数据工具</h1>
         <p className="mt-2 text-sm text-textSecondary">
-          照片明细检索、设备数据导入导出、照片索引数据库维护统一在此管理。
+          照片明细检索与图表统计导出、设备数据导入导出、照片索引数据库维护统一在此管理。
         </p>
       </div>
 
@@ -33,7 +33,7 @@ export default function DataToolsPage() {
           aria-controls="photo-files-workspace" className="flex w-full items-center justify-between gap-4 text-left rounded-lg focus-visible:outline-accent">
           <span>
             <span className="block text-lg font-semibold text-textPrimary">照片明细</span>
-            <span className="mt-1 block text-sm text-textSecondary">搜索索引文件、查看元数据及导出，展开后加载</span>
+            <span className="mt-1 block text-sm text-textSecondary">搜索索引文件、查看元数据、导出明细与图表统计，展开后加载</span>
           </span>
           <span className="button-secondary shrink-0">{filesOpen ? "收起" : "展开"}</span>
         </button>

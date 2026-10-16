@@ -192,7 +192,7 @@ export function AppSettingsProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     window.localStorage.setItem(LEGACY_SIMPLIFIED_MODE_KEY, settings.simplifiedMode ? "true" : "false");
-    if (settingsReady) {
+    if (settingsReady && settingsChangedBeforeLoad.current) {
       settingsWriteQueue.current = settingsWriteQueue.current
         .catch(() => undefined)
         .then(() => updateAppSettings(toApiSettings(settings)))

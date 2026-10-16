@@ -11,7 +11,7 @@ import {
 } from "../../api/photoData";
 
 import { useAppSettings } from "../layout/AppSettingsProvider";
-import { photoGearColor, photoGearLabel } from "../../utils/photoData";
+import { photoGearColor, photoGearLabel, photoTimelineSeries } from "../../utils/photoData";
 
 const ChartMotion = createContext(false);
 function useChartMotion() {
@@ -28,7 +28,7 @@ const tabs: { id: Tab; label: string }[] = [
 const colors = ["#5cc8ff","#b4a3ff","#ffc76f","#6fdbbd","#ff95b0","#98b7ef","#e9a6e0","#9cd67e"];
 const weekdays = ["周一","周二","周三","周四","周五","周六","周日"];
 const count = (n:number|null|undefined) => Number(n||0).toLocaleString("zh-CN");
-const ratio = (n:number,total:number) => total ? (n*100/total).toFixed(1)+"%" : "—";
+const ratio = (n:number,total:number) => total ? (n>0&&n*100/total<0.1?"<0.1%":(n*100/total).toFixed(1)+"%") : "—";
 const short = (s:string,n=20) => s.length>n?s.slice(0,n-1)+"…":s;
 const fieldRules = (field:string,name:string):PhotoRule[] =>
   name==="未记录"?[{field,op:"is_missing"}]:[{field,op:"eq",value:name}];
@@ -55,7 +55,7 @@ function Trend({title,desc,items,field,choose}:{
   const motion = useChartMotion();
   const monthly=field==="capture.month";
   const [range,setRange]=useState("24");
-  const sorted=[...items].sort((a,b)=>a.key.localeCompare(b.key));
+  const sorted=useMemo(()=>photoTimelineSeries(items,monthly),[items,monthly]);
   const shown=monthly&&range!=="all"?sorted.slice(-Number(range)):sorted;
   return <Panel title={title} desc={desc}>
     {monthly?<div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -94,8 +94,10 @@ function Ranking({title,desc,items,onChoose,max=12,order="count",total,colorForN
   wide?:boolean;
 }) {
   const ordered=order==="count"?[...items].sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name)):items;
-  const shown=ordered.filter(item=>item.name!=="未记录").slice(0,max);
+  const shown=ordered.filter(item=>item.name!=="未记录"&&!item.is_other).slice(0,max);
   const unknown=items.find(item=>item.name==="未记录");
+  const remaining=Math.max(0,(total??items.reduce((sum,item)=>sum+item.count,0))
+    -shown.reduce((sum,item)=>sum+item.count,0)-(unknown?.count??0));
   const peak=Math.max(1,...shown.map(item=>item.count));
   const label=(name:string)=>name.split(" + ").map(photoGearLabel).join(" + ");
   const row=(item:AnalyticsCount,index:number)=> <>
@@ -131,6 +133,7 @@ function Ranking({title,desc,items,onChoose,max=12,order="count",total,colorForN
       </div>:null}
     </div>:<NoData/>}
     {onChoose&&<p className="mt-3 text-[11px] text-textSecondary">点击条目可筛选{total!==undefined?" · 占比按当前全部拍摄计算":""}</p>}
+    {remaining>0?<p className="mt-2 text-xs text-textSecondary tabular-nums">另有 {count(remaining)} 次未列入当前榜单。</p>:null}
   </Panel>;
 }
 function Buckets({title,desc,items,onChoose}:{
@@ -151,9 +154,9 @@ function Buckets({title,desc,items,onChoose}:{
     {onChoose&&<p className="mt-1 text-[11px] text-textSecondary">{hint}（按数值区间）</p>}
   </Panel>;
 }
-function NumericDistribution({title,desc,items,total,line=false,logarithmic=false,unit="",choose}:{
+function NumericDistribution({title,desc,items,total,line=false,logarithmic=false,unit="",axisLabel="ISO",formatValue,choose}:{
   title:string;desc:string;items:AnalyticsValue[];total:number;line?:boolean;logarithmic?:boolean;
-  unit?:string;choose:(rules:PhotoRule[])=>void;
+  unit?:string;axisLabel?:string;formatValue?:(value:number)=>string;choose:(rules:PhotoRule[])=>void;
 }) {
   const motion=useChartMotion();
   const [valuesOpen,setValuesOpen]=useState(false);
@@ -182,8 +185,8 @@ function NumericDistribution({title,desc,items,total,line=false,logarithmic=fals
             <XAxis dataKey="value" type="number" scale={logarithmic?"log":"linear"}
               domain={domain}
               ticks={points.map(point=>point.value)} interval="preserveStartEnd" minTickGap={18} tick={{fontSize:11}}
-              tickFormatter={value=>Number(value).toLocaleString("zh-CN",{maximumFractionDigits:3})}
-              label={{value:unit?"数值（"+unit+"）":"ISO",position:"insideBottom",offset:-12,fontSize:11}}/>
+              tickFormatter={value=>formatValue?formatValue(Number(value)):Number(value).toLocaleString("zh-CN",{maximumFractionDigits:3})}
+              label={{value:unit?"数值（"+unit+"）":axisLabel,position:"insideBottom",offset:-12,fontSize:11}}/>
             <YAxis allowDecimals={false} tick={{fontSize:11}} tickFormatter={value=>count(Number(value))} width={60}/>
             {tooltip}
             <Line {...motion} isAnimationActive={motion.isAnimationActive&&points.length<=500} type="monotone" dataKey="count"
@@ -211,12 +214,16 @@ function NumericDistribution({title,desc,items,total,line=false,logarithmic=fals
     </>:<NoData/>}
   </Panel>;
 }
-function Donut({title,desc,items,onChoose}:{
-  title:string;desc:string;items:AnalyticsCount[];onChoose?:(name:string)=>void;
+function Donut({title,desc,items,total:population,onChoose}:{
+  title:string;desc:string;items:AnalyticsCount[];total?:number;onChoose?:(name:string)=>void;
 }) {
   const motion = useChartMotion();
-  const shown=items.filter(x=>x.count>0).slice(0,12);
-  const total=shown.reduce((s,x)=>s+x.count,0);
+  const total=population??items.reduce((sum,item)=>sum+item.count,0);
+  const shown=items.filter(x=>x.count>0&&!x.is_other&&x.name!=="未记录").slice(0,12);
+  const unknown=items.find(x=>x.name==="未记录"&&x.count>0);
+  if(unknown)shown.push(unknown);
+  const remaining=Math.max(0,total-shown.reduce((sum,item)=>sum+item.count,0));
+  if(remaining)shown.push({name:"其他（未展示）",count:remaining,is_other:true});
   return <Panel title={title} desc={desc}>
     {shown.length?<div className="grid sm:grid-cols-[175px_1fr] gap-3 items-center">
       <div className="h-48"><ResponsiveContainer width="100%" height="100%">
@@ -226,13 +233,13 @@ function Donut({title,desc,items,onChoose}:{
         </Pie><Tooltip formatter={v=>[count(Number(v)),"次数"]}/></PieChart>
       </ResponsiveContainer></div>
       <div className="space-y-1.5 max-h-52 overflow-y-auto">
-        {shown.map((x,i)=><button type="button" key={x.name} disabled={!onChoose}
+        {shown.map((x,i)=><button type="button" key={x.name} disabled={!onChoose||x.is_other}
           className="flex w-full gap-2 items-center justify-between text-left text-xs text-textSecondary enabled:hover:text-accent"
-          title={x.name} onClick={()=>onChoose?.(x.name)}>
+          title={x.name} onClick={()=>{if(!x.is_other)onChoose?.(x.name);}}>
           <span className="flex items-center gap-2 min-w-0">
             <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{backgroundColor:colors[i%colors.length]}}/>
             <span className="truncate">{x.name}</span>
-          </span><span className="shrink-0">{ratio(x.count,total)}</span>
+          </span><span className="shrink-0 tabular-nums">{count(x.count)} · {ratio(x.count,total)}</span>
         </button>)}
       </div>
     </div>:<NoData/>}
@@ -501,7 +508,7 @@ function GearByYear({data,kind,unavailable=false,onChoose}:{
 function Coverage({records,filterMissing}:{
   records:PhotoAnalytics["quality"];filterMissing:(name:string)=>void;
 }) {
-  return <Panel title="EXIF 元数据完整度" desc="占比基于当前筛选后的逻辑拍摄次数，缺失值不按 0 处理" wide>
+  return <Panel title="EXIF 元数据完整度" desc="按每次拍摄的代表文件统计；点击查看缺少字段的文件，同次拍摄的其他文件可能有值" wide>
     {records.some(r=>r.total)?<div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
       {records.map(r=><button className="text-left group" key={r.name} type="button"
         title="筛选缺少此元数据的照片" onClick={()=>filterMissing(r.name)}>
@@ -532,6 +539,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
     return ()=>{active=false;};
   },[serialized,refresh]);
   const d=data;
+  const undated=d?.overview.dated==null?0:Math.max(0,d.overview.captures-d.overview.dated);
   const onApplyRules=(rules:PhotoRule[])=>{if(!loading&&!error)applyRules(rules);};
   const choose=(field:string,name:string)=>onApplyRules(fieldRules(field,name));
   const bin=(b:AnalyticsBucket)=>onApplyRules(rangeRules(b.field,b.min,b.max));
@@ -560,6 +568,11 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
           document.getElementById("photo-tab-"+tabs[next].id)?.focus();
         }}>{t.label}</button>)}
     </div>
+    {d&&undated>0&&(tab==="overview"||tab==="timeline")?<div className="rounded-xl border border-line bg-panelAlt/60 px-4 py-3 text-xs text-textSecondary">
+      有 {count(undated)} 次拍摄缺少日期，未计入时间图表。
+      <button type="button" className="ml-2 text-accent hover:underline" disabled={loading}
+        onClick={()=>onApplyRules([{field:"capture.date",op:"is_missing"}])}>查看缺少日期的记录</button>
+    </div>:null}
     {error?<div role="alert" className="panel p-4 text-danger">{error}</div>:null}
     <div className="photo-loading-slot" role="status" aria-live="polite">
       {loading?<span className="inline-flex items-center gap-2 text-xs text-accent">
@@ -572,7 +585,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
     {!error&&d?<div key={tab} id={"photo-panel-"+tab} aria-labelledby={"photo-tab-"+tab} role="tabpanel"
       className={"photo-chart-grid grid grid-cols-1 lg:grid-cols-2 gap-4 "+(loading?"photo-chart-refreshing":"")} tabIndex={0}>
       {tab==="overview"&&<>
-        <Panel wide title="图库指标" desc="真实照片文件数与逻辑快门次数严格分开统计">
+        <Panel wide title="图库指标" desc="逻辑拍摄按文件名与 EXIF 分组估算；物理文件单独统计，不代表实际快门总数">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             {[
               ["逻辑拍摄",count(d.overview.captures)],
@@ -592,7 +605,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
         <Ranking title="常用机身 Top 8" desc="逻辑拍摄数，未识别信息单独列出"
           items={d.gear.cameras} total={d.overview.captures} colorForName={photoGearColor} max={8} onChoose={name=>choose("camera.model_norm",name)}/>
         <Donut title="物理文件格式" desc="RAW 与 JPEG 双份分别计入文件数量"
-          items={d.files.formats} onChoose={name=>choose("files.format_family",name)}/>
+          items={d.files.formats} total={d.overview.files} onChoose={name=>choose("files.format_family",name)}/>
       </>}
       {tab==="timeline"&&<>
         <Calendar daily={d.timeline.daily} choose={choose}/>
@@ -629,7 +642,7 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
         <GearByYear kind="镜头" data={(d.gear.lens_years??[]).map(point=>({...point,name:point.lens}))}
           unavailable={d.gear.lens_years===undefined} onChoose={name=>choose("lens.model_norm",name)}/>
         <Donut title="相机品牌占比" desc="依据 EXIF 品牌，未记录会单独标出"
-          items={d.gear.makers} onChoose={name=>choose("camera.make",name)}/>
+          items={d.gear.makers} total={d.overview.captures} onChoose={name=>choose("camera.make",name)}/>
         <GearMatrix cameras={d.gear.cameras} lenses={d.gear.lenses} data={d.gear.lens_by_camera}
           onChoose={(cam,lens)=>onApplyRules([...fieldRules("camera.model_norm",cam),...fieldRules("lens.model_norm",lens)])}/>
       </>}
@@ -641,7 +654,8 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
             items={d.exposure.distributions.focal} total={d.overview.captures} choose={onApplyRules}/>
           <NumericDistribution title="光圈分布" desc="按实际光圈档位排列；距标准档位 3% 内的表示偏差合并，其他值保留"
             items={d.exposure.distributions.aperture} total={d.overview.captures} choose={onApplyRules}/>
-          <NumericDistribution title="快门速度分布" desc="按曝光时间排列；距标准快门档位 1.5% 内的表示偏差合并，其他值保留"
+          <NumericDistribution line logarithmic axisLabel="曝光时间（秒）" title="快门速度分布" desc="横轴按曝光时间倍数排列，保留每个档位；距标准档位 1.5% 内的表示偏差合并"
+            formatValue={value=>value<1?"1/"+(1/value).toLocaleString("zh-CN",{maximumFractionDigits:1}):value.toLocaleString("zh-CN",{maximumFractionDigits:2})}
             items={d.exposure.distributions.shutter} total={d.overview.captures} choose={onApplyRules}/>
           <NumericDistribution title="曝光补偿分布" desc="距 1/3 或 1/2 EV 档位 0.02 EV 内的偏差合并；其他值保留，缺失不计入 0"
             items={d.exposure.distributions.ev} total={d.overview.captures} choose={onApplyRules}/>
@@ -653,10 +667,9 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
           <Buckets title="曝光补偿分布" desc="当前服务返回旧版区间统计" items={d.exposure.ev} onChoose={bin}/>
         </>}
         <Donut title="等效焦距识别来源" desc="EXIF 原生等效焦距、机身画幅推算或未知；未知不会按 1× 处理"
+          total={d.overview.captures}
           items={(d.exposure.focal_coverage??[]).map(v=>({...v,name:
             v.name==="EXIF"?"EXIF 等效焦距":v.name==="camera_profile"?"机身画幅换算":"画幅未知 / 无等效数据"}))}/>
-        <Donut title="闪光灯使用记录" desc="依赖可读的闪光元数据"
-          items={d.exposure.flash} onChoose={name=>choose("exposure.flash",name)}/>
         <Heat title="ISO × 快门热力图" desc="交叉分析光线强度、快门速度和感光度"
           xs={["<200","200–799","800–3199","3200–12799","≥12800"]}
           ys={["<1/1000s","1/1000–1/100s","1/100–1/10s","1/10–1s","≥1s"]}
@@ -671,38 +684,29 @@ export function PhotoAnalyticsDashboard({filter,refresh,onApplyRules:applyRules}
             ...rangeRules("exposure.focal_eq_mm",focalRanges[x][0],focalRanges[x][1]),
             ...rangeRules("exposure.aperture",apRanges[y][0],apRanges[y][1])
           ])}/>
-        <Ranking title="白平衡设置" desc="相机白平衡 EXIF 值" items={d.exposure.wb}
-          onChoose={name=>choose("camera.white_balance",name)}/>
-        <Ranking title="对焦模式" desc="厂商扩展标签可用性因机型而异" items={d.exposure.focus}
-          onChoose={name=>choose("camera.focus_mode",name)}/>
-        <Ranking title="连拍与驱动模式" desc="单拍或连拍等机内设置" items={d.exposure.drive}
-          onChoose={name=>choose("camera.drive_mode",name)}/>
-        <Donut title="电子 / 机械快门类型" desc="取决于相机是否记录相应元数据" items={d.exposure.shutter_type}
-          onChoose={name=>choose("camera.shutter_type",name)}/>
-        <Ranking title="胶片模拟与创意风格" desc="富士胶片模拟、Sony 创意外观等" items={d.exposure.picture_style}
-          onChoose={name=>choose("camera.picture_style",name)}/>
       </>}
       {tab==="files"&&<>
-        <Donut title="物理文件格式分布" desc="RAW/JPEG/HEIF 等文件实际数量" items={d.files.formats}
+        <Donut title="物理文件格式分布" desc="RAW/JPEG/HEIF 等文件实际数量" items={d.files.formats} total={d.overview.files}
           onChoose={name=>choose("files.format_family",name)}/>
-        <Donut title="拍摄主文件格式" desc="每次拍摄只选一个代表文件（元数据完整度优先）" items={d.files.capture_formats}/>
+        <Donut title="拍摄主文件格式" desc="每次拍摄只选一个代表文件（元数据完整度优先）" items={d.files.capture_formats} total={d.overview.captures}/>
         <Buckets title="文件大小分布" desc="单位 MiB，按物理文件统计" items={d.files.size} onChoose={bin}/>
         <Buckets title="分辨率分布" desc="照片元数据宽高相乘，单位百万像素" items={d.files.resolution} onChoose={bin}/>
-        <Donut title="横竖拍占比" desc="通过 EXIF 像素宽高判定，未知项单独显示" items={d.files.orientation}/>
-        <Donut title="画面长宽比" desc="3:2、4:3、16:9、1:1 等常见画幅" items={d.files.aspect}/>
-        <Donut title="EXIF 解析成功率" desc="按物理文件计算的解析状态" items={d.files.status}
+        <Donut title="画面长宽比" desc="3:2、4:3、16:9、1:1 等常见画幅" items={d.files.aspect} total={d.overview.captures}/>
+        <Donut title="EXIF 解析成功率" desc="表示文件解析是否完成，不代表每个 EXIF 字段都有有效值" items={d.files.status} total={d.overview.files}
           onChoose={name=>choose("files.parse_status",name)}/>
         <Ranking title="后期软件分布" desc="原片或导出图片中可能有 Software 字段"
-          items={d.files.software} onChoose={name=>choose("files.software",name)}/>
-        <Donut title="色彩空间" desc="记录中的 sRGB、Adobe RGB 等" items={d.files.color_space}
-          onChoose={name=>choose("files.color_space",name)}/>
-        <Coverage records={d.quality} filterMissing={name=>{
+          items={d.files.software} total={d.overview.captures} onChoose={name=>choose("files.software",name)}/>
+        <Coverage records={d.quality.filter(item=>!["闪光灯","白平衡","对焦模式"].includes(item.name))} filterMissing={name=>{
+          if(name==="分辨率"){
+            onApplyRules([{op:"or",children:[
+              {field:"files.width_px",op:"is_missing"},{field:"files.height_px",op:"is_missing"}
+            ]}]);return;
+          }
           const fields:Record<string,string>={
             "拍摄时间":"capture.date","机身":"camera.model_norm","镜头":"lens.model_norm",
             "ISO":"exposure.iso","光圈":"exposure.aperture",
             "快门":"exposure.shutter","焦距":"exposure.focal_mm",
-            "曝光补偿":"exposure.compensation","分辨率":"files.width_px",
-            "闪光灯":"exposure.flash","白平衡":"camera.white_balance","对焦模式":"camera.focus_mode"
+            "曝光补偿":"exposure.compensation"
           };
           if(fields[name])onApplyRules([{field:fields[name],op:"is_missing"}]);
         }}/>
@@ -720,8 +724,8 @@ function GearMatrix({cameras,lenses,data,onChoose}:{
   data:PhotoAnalytics["gear"]["lens_by_camera"];
   onChoose:(camera:string,lens:string)=>void;
 }) {
-  const cols=cameras.slice(0,8).map(x=>x.name);
-  const rows=lenses.slice(0,8).map(x=>x.name);
+  const cols=cameras.filter(x=>!x.is_other).slice(0,8).map(x=>x.name);
+  const rows=lenses.filter(x=>!x.is_other).slice(0,8).map(x=>x.name);
   const cells:AnalyticsHeatCell[]=[];
   for(const entry of data){
     const x=cols.indexOf(entry.camera), y=rows.indexOf(entry.lens);

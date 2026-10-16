@@ -29,7 +29,7 @@ export type PhotoPreset = {id:string;name:string;filter:PhotoFilter;columns:stri
 
 export const emptyPhotoFilter = (): PhotoFilter => ({ version: "photo-filter.v1", group: { op: "and", children: [] } });
 const path = "/api/v1/photo-data";
-export type AnalyticsCount = { name: string; count: number };
+export type AnalyticsCount = { name: string; count: number; is_other?: boolean };
 export type AnalyticsPoint = { key: string; count: number };
 export type AnalyticsBucket = { label: string; bucket: number; count: number; min: number | null; max: number | null; field: string };
 export type AnalyticsValue = { value: number; label: string; count: number; min: number; max: number; field: string };
@@ -115,8 +115,8 @@ export const createPhotoPreset = (name:string,filter:PhotoFilter,columns:string[
   apiPost<PhotoPreset>(path+"/filter-presets", {name,filter,columns});
 export const deletePhotoPreset = (id:string) => apiDelete(path+"/filter-presets/"+encodeURIComponent(id));
 
-export async function exportPhotoData(filter:PhotoFilter):Promise<void> {
-  const response = await fetch(path+"/exports", {
+async function downloadPhotoExport(filter:PhotoFilter,endpoint:string,filename:string):Promise<void> {
+  const response = await fetch(path+endpoint, {
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({filter})
   });
@@ -128,9 +128,15 @@ export async function exportPhotoData(filter:PhotoFilter):Promise<void> {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "geargrade-photo-data.zip";
+  anchor.download = filename;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+
+export const exportPhotoData = (filter:PhotoFilter):Promise<void> =>
+  downloadPhotoExport(filter,"/exports","geargrade-photo-data.zip");
+
+export const exportPhotoStatistics = (filter:PhotoFilter):Promise<void> =>
+  downloadPhotoExport(filter,"/exports/statistics","geargrade-photo-statistics.zip");

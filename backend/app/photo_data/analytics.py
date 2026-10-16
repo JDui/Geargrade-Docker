@@ -11,7 +11,6 @@ import sqlite3
 from typing import Any
 
 from . import service
-from .db import connect
 
 # Edges define [lower, upper) ranges. Extremes remain open-ended.
 ISO_EDGES = (100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600)
@@ -126,10 +125,23 @@ def _metric(db: sqlite3.Connection, sql: str) -> int:
 
 def _top(db: sqlite3.Connection, column: str, limit: int = 12,
          source: str = "captures", extra: str = "1=1") -> list[dict]:
-    return grouped(db,
-        f"SELECT COALESCE(NULLIF(TRIM({column}),''),'未记录') AS name,"
-        f"COUNT(*) AS count FROM {source} WHERE {extra} "
-        f"GROUP BY name ORDER BY count DESC,name LIMIT ?", (limit,))
+    # Bound individual categories, but retain missing and omitted observations.
+    # Otherwise a Top N chart silently inflates every displayed percentage.
+    value = f"NULLIF(TRIM({column}),'')"
+    items = grouped(db,
+        f"SELECT {value} AS name,COUNT(*) AS count FROM {source} "
+        f"WHERE {extra} AND {value} IS NOT NULL "
+        "GROUP BY name ORDER BY count DESC,name LIMIT ?", (limit,))
+    totals = db.execute(
+        f"SELECT COUNT(*) AS total,COUNT(*)-COUNT({value}) AS missing "
+        f"FROM {source} WHERE {extra}"
+    ).fetchone()
+    if totals["missing"]:
+        items.append({"name": "未记录", "count": totals["missing"]})
+    remaining = totals["total"] - sum(item["count"] for item in items)
+    if remaining:
+        items.append({"name": "其他（未展示）", "count": remaining, "is_other": True})
+    return items
 
 
 def _calendar(db: sqlite3.Connection) -> list[dict]:
@@ -155,17 +167,17 @@ def _gear_years(db: sqlite3.Connection, kind: str) -> list[dict]:
 def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
     """Return bounded aggregated series. No entire source-file listing is returned."""
     where, args = service.compile_filter(filter_ast)
-    with connect() as db:
+    with service.indexed_connection() as db:
         # Prevent a long read from starving other indexed requests.
         db.execute("PRAGMA busy_timeout=30000")
         db.execute("CREATE TEMP TABLE selected_files AS "
-                   "SELECT capture_key,format_family,size_bytes,parse_status,"
+                   "SELECT id,capture_key,format_family,size_bytes,parse_status,"
                    "shot_at,camera_make,camera_model,camera_norm,lens_model,lens_norm,"
                    "iso,aperture,shutter,focal_mm,exposure_comp,flash,wb,focus_mode,"
                    "shutter_type,drive_mode,picture_style,width_px,height_px,"
                    "color_space,software," + service.FOCAL_EQ_SQL + " AS focal_eq_mm," +
                    service.FOCAL_EQ_SOURCE_SQL + " AS focal_eq_source "
-                   "FROM photos WHERE " + where, args)
+                   "FROM indexed_photos WHERE " + where, args)
         db.execute("CREATE INDEX sf_capture ON selected_files(capture_key,format_family)")
         # Prefer metadata-complete variants within a single RAW+JPEG logical capture.
         db.execute("""
@@ -179,8 +191,10 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
                 ROW_NUMBER() OVER (
                   PARTITION BY capture_key ORDER BY
                   (shot_at IS NULL),(camera_norm IS NULL),(lens_norm IS NULL),
+                  (iso IS NULL)+(aperture IS NULL)+(shutter IS NULL)+(focal_mm IS NULL)
+                    +(width_px IS NULL)+(height_px IS NULL),
                   CASE format_family WHEN 'raw' THEN 0 WHEN 'jpeg' THEN 1
-                                     WHEN 'heif' THEN 2 ELSE 3 END
+                                     WHEN 'heif' THEN 2 ELSE 3 END,id
                 ) AS rn FROM selected_files
             ) WHERE rn=1
         """)
@@ -189,16 +203,16 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
         db.execute("CREATE INDEX cp_lens ON captures(lens_norm)")
         overview = dict(db.execute("""
             SELECT COUNT(*) AS captures,
-              SUM(CASE WHEN shot_at IS NOT NULL THEN 1 ELSE 0 END) AS dated,
-              SUM(CASE WHEN camera_norm IS NOT NULL THEN 1 ELSE 0 END) AS camera_known,
-              SUM(CASE WHEN lens_norm IS NOT NULL THEN 1 ELSE 0 END) AS lens_known,
+              COUNT(shot_at) AS dated,
+              COUNT(camera_norm) AS camera_known,
+              COUNT(lens_norm) AS lens_known,
               MIN(shot_at) AS first_shot,MAX(shot_at) AS last_shot
             FROM captures
         """).fetchone())
         file_totals = dict(db.execute("""
             SELECT COUNT(*) AS files,COALESCE(SUM(size_bytes),0) AS bytes,
-              SUM(CASE WHEN format_family='raw' THEN 1 ELSE 0 END) AS raw_files,
-              SUM(CASE WHEN parse_status!='ok' THEN 1 ELSE 0 END) AS failed_files
+              COALESCE(SUM(CASE WHEN format_family='raw' THEN 1 ELSE 0 END),0) AS raw_files,
+              COALESCE(SUM(CASE WHEN parse_status!='ok' THEN 1 ELSE 0 END),0) AS failed_files
             FROM selected_files
         """).fetchone())
         paired = _metric(db, """
@@ -263,7 +277,7 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
             "focal": _buckets(db,"focal_eq_mm",FOCAL_EDGES,"exposure.focal_eq_mm"),
             "focal_coverage": grouped(db,
                 "SELECT focal_eq_source AS name,COUNT(*) AS count FROM captures "
-                "WHERE focal_mm IS NOT NULL GROUP BY focal_eq_source ORDER BY count DESC"),
+                "GROUP BY focal_eq_source ORDER BY count DESC"),
             "aperture": _buckets(db,"aperture",APERTURE_EDGES,"exposure.aperture"),
             "shutter": _buckets(db,"shutter",SHUTTER_EDGES,"exposure.shutter",_duration_label),
             "ev": _buckets(db,"exposure_comp",EV_EDGES,"exposure.compensation"),
@@ -336,8 +350,7 @@ def analyze(filter_ast: dict | None = None) -> dict[str, Any]:
             ("拍摄时间", "shot_at"), ("机身", "camera_norm"), ("镜头", "lens_norm"),
             ("ISO", "iso"), ("光圈", "aperture"), ("快门", "shutter"),
             ("焦距", "focal_mm"), ("曝光补偿", "exposure_comp"),
-            ("分辨率", "width_px"), ("闪光灯", "flash"),
-            ("白平衡", "wb"), ("对焦模式", "focus_mode"),
+            ("分辨率", "CASE WHEN width_px>0 AND height_px>0 THEN width_px END"),
         )
         completeness = grouped(db,
             "SELECT " + ",".join(

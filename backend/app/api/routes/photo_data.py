@@ -173,3 +173,10 @@ def delete_preset(preset_id: str):
 def export(payload: FilterInput):
     return Response(content=call(photos.export_zip, payload.filter), media_type="application/zip",
                     headers={"Content-Disposition": "attachment; filename=geargrade-photo-data.zip"})
+
+
+@router.post("/exports/statistics")
+def export_statistics(payload: FilterInput):
+    from app.photo_data.statistics_export import export_statistics as build_statistics
+    return Response(content=call(build_statistics, payload.filter), media_type="application/zip",
+                    headers={"Content-Disposition": "attachment; filename=geargrade-photo-statistics.zip"})
